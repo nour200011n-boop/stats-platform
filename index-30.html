@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سجلات المراجعين — تسجيل الدخول</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="center-page">
+  <div class="card" style="width:100%; max-width:400px;">
+    <div class="card-pad" style="text-align:center;">
+      <div class="brand-mark" style="margin:0 auto 12px;">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z"/><path d="M6 6h12a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/><path d="M9 12h6M9 16h4"/></svg>
+      </div>
+      <h1 style="font-size:18px; margin:0;">سجلات المراجعين</h1>
+      <p style="font-size:13px; color:var(--ink-faint); margin:6px 0 26px;">سجّل دخولك بحساب Google للمتابعة</p>
+
+      <button type="button" class="btn btn-ghost btn-block" id="googleSignInBtn" style="gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 15.1 18.9 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.5 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+          <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.4 26.7 36 24 36c-5.2 0-9.6-3.1-11.3-7.6l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.8l6.2 5.2C39.6 36.9 44 30.9 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+        </svg>
+        <span id="googleBtnText">تسجيل الدخول عبر Google</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  loadTheme();
+
+  var googleBtn = document.getElementById("googleSignInBtn");
+  var googleBtnText = document.getElementById("googleBtnText");
+
+  // إن كان المستخدم مسجّلاً دخوله بالفعل (جلسة سابقة)، وجّهه مباشرة
+  // بدل إظهار زر الدخول من جديد.
+  auth.onAuthStateChanged(function(user){
+    if(user) routeAfterAuth(user);
+  });
+
+  googleBtn.addEventListener("click", async function(){
+    googleBtn.disabled = true;
+    googleBtnText.textContent = "...";
+    try{
+      // signInWithPopup بدل signInWithRedirect: الأخيرة تفشل على بعض
+      // متصفحات الجوال (خصوصاً أندرويد) برسالة "missing initial state"
+      // بسبب تقسيم sessionStorage بين الصفحة الأصلية وصفحة العودة من
+      // Google. النافذة المنبثقة تتجنب هذه المشكلة تماماً.
+      var provider = new firebase.auth.GoogleAuthProvider();
+      var result = await auth.signInWithPopup(provider);
+      routeAfterAuth(result.user);
+    }catch(err){
+      googleBtn.disabled = false;
+      googleBtnText.textContent = "تسجيل الدخول عبر Google";
+      showToast(translateAuthError(err), true);
+    }
+  });
+
+  function translateAuthError(err){
+    var map = {
+      "auth/network-request-failed": "تعذّر الاتصال بالخادم — تحقق من اتصال الإنترنت وحاول مرة أخرى.",
+      "auth/unauthorized-domain": "هذا الموقع غير مصرَّح له بالدخول عبر Google — أضف نطاقه في إعدادات Firebase Authentication.",
+      "auth/popup-closed-by-user": "تم إغلاق نافذة تسجيل الدخول قبل الإكمال.",
+      "auth/popup-blocked": "المتصفح حجب النافذة المنبثقة — اسمح بالنوافذ المنبثقة لهذا الموقع وحاول مرة أخرى.",
+      "auth/cancelled-popup-request": "تم إلغاء المحاولة السابقة، حاول مجدداً."
+    };
+    return map[err.code] || ("حدث خطأ: " + err.message);
+  }
+
+  async function routeAfterAuth(user){
+    // تأكد من وجود مستند المستخدم الأساسي عند أول دخول لهذا الحساب.
+    var snap = await db.collection("users").doc(user.uid).get();
+    if(!snap.exists){
+      await db.collection("users").doc(user.uid).set({ email: user.email });
+    }
+
+    if(isSuperAdminEmail(user.email)){
+      window.location.href = "admin.html";
+      return;
+    }
+
+    var data = snap.exists ? snap.data() : { email: user.email };
+    var unlocked = data.unlockedUntil &&
+      (data.unlockedUntil.toDate ? data.unlockedUntil.toDate() : new Date(data.unlockedUntil)) > new Date();
+
+    if(!unlocked || !data.pharmacyId){
+      window.location.href = "unlock.html";
+    } else {
+      window.location.href = "app.html";
+    }
+  }
+})();
+</script>
+</body>
+</html>
