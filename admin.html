@@ -33,7 +33,6 @@
       <span>لوحة الإدارة العليا</span>
     </div>
     <div style="flex:1;"></div>
-    <button class="btn btn-ghost" id="goToAppBtn">عرض التطبيق</button>
     <button class="btn btn-danger-ghost" id="logoutBtn">خروج</button>
   </div>
 </div>
@@ -105,6 +104,16 @@
 
   guardPage({ requireSuperAdmin:true, onReady:function(){ loadTheme(); init(); } });
 
+  // يُستدعى عند فشل أي مستمع Firestore (غالباً بسبب قواعد أمان غير
+  // منشورة بعد، أو مشكلة اتصال) — بدل فشل صامت يترك التبويب فارغاً بلا
+  // تفسير، يظهر تنبيهاً واضحاً بنص الخطأ الفعلي من Firebase.
+  function onListenerError(label){
+    return function(err){
+      showToast("خطأ بجلب بيانات "+label+": "+err.message, true);
+      console.error(label, err);
+    };
+  }
+
   function init(){
     document.querySelectorAll(".tab-btn").forEach(function(btn){
       btn.onclick=function(){
@@ -115,14 +124,13 @@
       };
     });
     document.getElementById("logoutBtn").onclick=function(){ auth.signOut().then(function(){window.location.href="index.html";}); };
-    document.getElementById("goToAppBtn").onclick=function(){ window.location.href="app.html"; };
 
-    db.collection("pharmacies").onSnapshot(function(s){ pharmacies=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderDashboard(); renderPharmacies(); renderPlanSelectOptions(); });
-    db.collection("subscriptionPlans").onSnapshot(function(s){ plans=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderPlans(); renderPlanSelectOptions(); });
-    db.collection("activationCodes").onSnapshot(function(s){ activationCodes=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderActivationCodes(); });
-    db.collection("features").onSnapshot(function(s){ features=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderFeatures(); });
-    db.collection("accessCodes").orderBy("createdAt","desc").onSnapshot(function(s){ accessCodes=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderAccessCodes(); });
-    db.collection("ads").orderBy("createdAt","desc").onSnapshot(function(s){ ads=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderAds(); });
+    db.collection("pharmacies").onSnapshot(function(s){ pharmacies=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderDashboard(); renderPharmacies(); renderPlanSelectOptions(); }, onListenerError("الصيدليات"));
+    db.collection("subscriptionPlans").onSnapshot(function(s){ plans=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderPlans(); renderPlanSelectOptions(); }, onListenerError("خطط الاشتراك"));
+    db.collection("activationCodes").onSnapshot(function(s){ activationCodes=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderActivationCodes(); }, onListenerError("رموز التفعيل"));
+    db.collection("features").onSnapshot(function(s){ features=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderFeatures(); }, onListenerError("الميزات"));
+    db.collection("accessCodes").orderBy("createdAt","desc").onSnapshot(function(s){ accessCodes=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderAccessCodes(); }, onListenerError("رموز الفتح"));
+    db.collection("ads").orderBy("createdAt","desc").onSnapshot(function(s){ ads=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderAds(); }, onListenerError("الإعلانات"));
 
     document.getElementById("closePharmacyOverlay").onclick=function(){ document.getElementById("pharmacyOverlay").classList.remove("open"); };
     document.getElementById("pharmacyOverlay").onclick=function(e){ if(e.target===this) this.classList.remove("open"); };
@@ -273,11 +281,13 @@
     document.getElementById("createPlanBtn").onclick=async function(){
       var name = document.getElementById("planNameInput").value.trim();
       if(!name) return;
-      await db.collection("subscriptionPlans").add({
-        name:name, features:[], removeAds:document.getElementById("planRemoveAds").checked,
-        createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      });
-      showToast("تم إنشاء الخطة");
+      try{
+        await db.collection("subscriptionPlans").add({
+          name:name, features:[], removeAds:document.getElementById("planRemoveAds").checked,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast("تم إنشاء الخطة");
+      }catch(err){ showToast("تعذّر إنشاء الخطة: "+err.message, true); }
     };
     document.getElementById("createCodeBtn").onclick=async function(){
       var planId = document.getElementById("codePlanSelect").value;
@@ -285,11 +295,13 @@
       var maxUses = parseInt(document.getElementById("codeMaxUses").value,10);
       if(!planId||!duration||!maxUses) { showToast("أنشئ خطة أولاً واملأ الحقول", true); return; }
       var code = generateRandomCode();
-      await db.collection("activationCodes").doc(code).set({
-        planId:planId, durationDays:duration, maxUses:maxUses, usedCount:0,
-        expiresAt:null, isCancelled:false, usageLog:[], createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      });
-      showToast("تم إنشاء الرمز: "+code);
+      try{
+        await db.collection("activationCodes").doc(code).set({
+          planId:planId, durationDays:duration, maxUses:maxUses, usedCount:0,
+          expiresAt:null, isCancelled:false, usageLog:[], createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast("تم إنشاء الرمز: "+code);
+      }catch(err){ showToast("تعذّر إنشاء الرمز: "+err.message, true); }
     };
     renderActivationCodes();
   }
@@ -327,8 +339,10 @@
       var key=document.getElementById("featKeyInput").value.trim();
       var name=document.getElementById("featNameInput").value.trim();
       if(!key||!name) return;
-      await db.collection("features").add({key:key, name:name, description:document.getElementById("featDescInput").value.trim(), enabledGlobally:false, linkedPlanIds:[]});
-      showToast("تمت الإضافة");
+      try{
+        await db.collection("features").add({key:key, name:name, description:document.getElementById("featDescInput").value.trim(), enabledGlobally:false, linkedPlanIds:[]});
+        showToast("تمت الإضافة");
+      }catch(err){ showToast("تعذّرت الإضافة: "+err.message, true); }
     };
     renderFeaturesList();
   }
@@ -387,11 +401,13 @@
       var maxUses=parseInt(document.getElementById("accMaxUses").value,10);
       if(!duration||!maxUses) return;
       var code = generateRandomCode();
-      await db.collection("accessCodes").doc(code).set({
-        durationDays:duration, maxUses:maxUses, usedCount:0, usedByEmails:[], isCancelled:false,
-        createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      });
-      showToast("تم إنشاء الرمز: "+code);
+      try{
+        await db.collection("accessCodes").doc(code).set({
+          durationDays:duration, maxUses:maxUses, usedCount:0, usedByEmails:[], isCancelled:false,
+          createdAt:firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast("تم إنشاء الرمز: "+code);
+      }catch(err){ showToast("تعذّر إنشاء الرمز: "+err.message, true); }
     };
     renderAccessCodes();
   }

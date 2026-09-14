@@ -266,6 +266,12 @@
   }
 
   guardPage({ onReady: function(user, userData){
+    // حماية إضافية: لا تكمل أبداً بدون pharmacyId حقيقي، حتى لو وصل
+    // المستخدم لهذه الصفحة بطريقة غير متوقعة (مثل حساب لا يملك صيدلية).
+    if(!userData || !userData.pharmacyId){
+      window.location.href = "unlock.html";
+      return;
+    }
     currentUser = user;
     pharmacyId = userData.pharmacyId;
     loadTheme();
