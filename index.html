@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سجلات المراجعين — تسجيل الدخول</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="center-page">
+  <div class="card" style="width:100%; max-width:400px;">
+    <div class="card-pad">
+      <div style="text-align:center; margin-bottom:22px;">
+        <div class="brand-mark" style="margin:0 auto 12px;">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z"/><path d="M6 6h12a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/><path d="M9 12h6M9 16h4"/></svg>
+        </div>
+        <h1 style="font-size:18px; margin:0;">سجلات المراجعين</h1>
+        <p style="font-size:13px; color:var(--ink-faint); margin:4px 0 0;" id="modeSubtitle">تسجيل الدخول إلى حسابك</p>
+      </div>
+
+      <form id="authForm">
+        <div class="field" id="field-email">
+          <label>البريد الإلكتروني</label>
+          <input type="email" id="inputEmail" placeholder="example@mail.com" required>
+        </div>
+        <div class="field" id="field-password">
+          <label>كلمة المرور</label>
+          <input type="password" id="inputPassword" placeholder="••••••••" required minlength="6">
+          <div class="err-msg" id="passwordErr">كلمة المرور يجب أن تكون 6 أحرف على الأقل.</div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">تسجيل الدخول</button>
+      </form>
+
+      <p style="text-align:center; font-size:13px; margin-top:16px;">
+        <span id="toggleText">ليس لديك حساب؟</span>
+        <a href="#" id="toggleModeLink">إنشاء حساب جديد</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="shared.js"></script>
+<script>
+(function(){
+  "use strict";
+  loadTheme();
+
+  var isSignup = false;
+  var form = document.getElementById("authForm");
+  var submitBtn = document.getElementById("submitBtn");
+  var toggleLink = document.getElementById("toggleModeLink");
+  var toggleText = document.getElementById("toggleText");
+  var modeSubtitle = document.getElementById("modeSubtitle");
+
+  toggleLink.addEventListener("click", function(e){
+    e.preventDefault();
+    isSignup = !isSignup;
+    submitBtn.textContent = isSignup ? "إنشاء الحساب" : "تسجيل الدخول";
+    toggleText.textContent = isSignup ? "لديك حساب بالفعل؟" : "ليس لديك حساب؟";
+    toggleLink.textContent = isSignup ? "تسجيل الدخول" : "إنشاء حساب جديد";
+    modeSubtitle.textContent = isSignup ? "أنشئ حساباً جديداً" : "تسجيل الدخول إلى حسابك";
+  });
+
+  // إن كان المستخدم مسجّلاً دخوله بالفعل (جلسة سابقة)، وجّهه مباشرة
+  // بدل إظهار نموذج الدخول من جديد.
+  auth.onAuthStateChanged(function(user){
+    if(user) routeAfterAuth(user);
+  });
+
+  form.addEventListener("submit", async function(e){
+    e.preventDefault();
+    var email = document.getElementById("inputEmail").value.trim();
+    var password = document.getElementById("inputPassword").value;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "...";
+
+    try{
+      var cred;
+      if(isSignup){
+        cred = await auth.createUserWithEmailAndPassword(email, password);
+        // إنشاء مستند المستخدم الأساسي — القاعدة الأمنية تسمح بهذا
+        // فقط عند إنشاء أول مرة وبنفس إيميل الحساب.
+        await db.collection("users").doc(cred.user.uid).set({ email: email });
+      } else {
+        cred = await auth.signInWithEmailAndPassword(email, password);
+      }
+      routeAfterAuth(cred.user);
+    }catch(err){
+      submitBtn.disabled = false;
+      submitBtn.textContent = isSignup ? "إنشاء الحساب" : "تسجيل الدخول";
+      showToast(translateAuthError(err), true);
+    }
+  });
+
+  function translateAuthError(err){
+    var map = {
+      "auth/email-already-in-use": "هذا البريد الإلكتروني مستخدَم مسبقاً.",
+      "auth/invalid-email": "صيغة البريد الإلكتروني غير صحيحة.",
+      "auth/weak-password": "كلمة المرور ضعيفة جداً (6 أحرف على الأقل).",
+      "auth/user-not-found": "لا يوجد حساب بهذا البريد الإلكتروني.",
+      "auth/wrong-password": "كلمة المرور غير صحيحة.",
+      "auth/invalid-credential": "بيانات الدخول غير صحيحة.",
+      "auth/too-many-requests": "محاولات كثيرة، حاول لاحقاً."
+    };
+    return map[err.code] || ("حدث خطأ: " + err.message);
+  }
+
+  async function routeAfterAuth(user){
+    if(isSuperAdminEmail(user.email)){
+      window.location.href = "admin.html";
+      return;
+    }
+    var snap = await db.collection("users").doc(user.uid).get();
+    var data = snap.exists ? snap.data() : null;
+    var unlocked = data && data.unlockedUntil &&
+      (data.unlockedUntil.toDate ? data.unlockedUntil.toDate() : new Date(data.unlockedUntil)) > new Date();
+
+    if(!unlocked || !data || !data.pharmacyId){
+      window.location.href = "unlock.html";
+    } else {
+      window.location.href = "app.html";
+    }
+  }
+})();
+</script>
+</body>
+</html>

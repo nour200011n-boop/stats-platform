@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة الإدارة العليا</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .tabs{display:flex; gap:8px; overflow-x:auto; padding-bottom:12px; margin-bottom:18px; border-bottom:1px solid var(--line);}
+  .tab-btn{flex-shrink:0; height:38px; padding:0 16px; border-radius:100px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); font-weight:700; font-size:13.5px; cursor:pointer; white-space:nowrap;}
+  .tab-btn.active{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .mini-form{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:18px;}
+  .switch{position:relative; width:42px; height:24px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch-track{position:absolute; inset:0; background:var(--line); border-radius:100px; cursor:pointer; transition:.15s;}
+  .switch-track:before{content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s;}
+  .switch input:checked + .switch-track{background:var(--primary);}
+  html[dir="rtl"] .switch input:checked + .switch-track:before{transform:translateX(-18px);}
+  html[dir="ltr"] .switch input:checked + .switch-track:before{transform:translateX(18px);}
+  .avatar{width:40px; height:40px; border-radius:50%; background:var(--primary-tint); color:var(--primary-dark); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span>لوحة الإدارة العليا</span>
+    </div>
+    <div style="flex:1;"></div>
+    <button class="btn btn-ghost" id="goToAppBtn">عرض التطبيق</button>
+    <button class="btn btn-danger-ghost" id="logoutBtn">خروج</button>
+  </div>
+</div>
+
+<main>
+  <div class="tabs" id="tabBar">
+    <button class="tab-btn active" data-tab="dashboard">الإحصائيات</button>
+    <button class="tab-btn" data-tab="pharmacies">الصيدليات</button>
+    <button class="tab-btn" data-tab="plans">الخطط والتفعيل</button>
+    <button class="tab-btn" data-tab="features">الميزات</button>
+    <button class="tab-btn" data-tab="access">رموز الفتح</button>
+    <button class="tab-btn" data-tab="ads">الإعلانات</button>
+  </div>
+
+  <div id="tab-dashboard" class="tab-panel"></div>
+  <div id="tab-pharmacies" class="tab-panel" style="display:none;"></div>
+  <div id="tab-plans" class="tab-panel" style="display:none;"></div>
+  <div id="tab-features" class="tab-panel" style="display:none;"></div>
+  <div id="tab-access" class="tab-panel" style="display:none;"></div>
+  <div id="tab-ads" class="tab-panel" style="display:none;"></div>
+</main>
+
+<!-- Pharmacy detail overlay -->
+<div class="overlay" id="pharmacyOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3>تفاصيل الصيدلية</h3><button class="btn btn-ghost btn-icon" id="closePharmacyOverlay">✕</button></div>
+    <div class="modal-body" id="pharmacyOverlayBody"></div>
+  </div>
+</div>
+
+<!-- Ad editor overlay -->
+<div class="overlay" id="adOverlayModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="adEditorTitle">إعلان جديد</h3><button class="btn btn-ghost btn-icon" id="closeAdEditor">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>صورة (اختياري)</label>
+        <input type="file" id="adImageInput" accept="image/*">
+        <div id="adImagePreview" style="margin-top:8px;"></div>
+      </div>
+      <div class="field"><label>رابط فيديو (اختياري)</label><input type="text" id="adVideoUrl" placeholder="https://..."></div>
+      <div class="field"><label>نص الإعلان (اختياري)</label><textarea id="adText"></textarea></div>
+      <div class="field"><label>الاستهداف الجغرافي (فارغ = كل المحافظات)</label>
+        <div id="adProvinceChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="adProvinceInput" placeholder="اسم محافظة">
+          <button type="button" class="btn btn-ghost" id="addProvinceBtn">إضافة</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" id="saveAdBtn">حفظ الإعلان</button>
+      <button class="btn btn-ghost" id="cancelAdEditor">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="shared.js"></script>
+<script src="platform.js"></script>
+<script>
+(function(){
+  "use strict";
+  var pharmacies=[], plans=[], activationCodes=[], features=[], accessCodes=[], ads=[];
+  var currentPharmacyDetailId = null, editingAdId = null, adTargetProvinces = [], adImageFile = null, adExistingImageUrl = null;
+
+  guardPage({ requireSuperAdmin:true, onReady:function(){ loadTheme(); init(); } });
+
+  function init(){
+    document.querySelectorAll(".tab-btn").forEach(function(btn){
+      btn.onclick=function(){
+        document.querySelectorAll(".tab-btn").forEach(function(b){b.classList.remove("active");});
+        document.querySelectorAll(".tab-panel").forEach(function(p){p.style.display="none";});
+        btn.classList.add("active");
+        document.getElementById("tab-"+btn.getAttribute("data-tab")).style.display="block";
+      };
+    });
+    document.getElementById("logoutBtn").onclick=function(){ auth.signOut().then(function(){window.location.href="index.html";}); };
+    document.getElementById("goToAppBtn").onclick=function(){ window.location.href="app.html"; };
+
+    db.collection("pharmacies").onSnapshot(function(s){ pharmacies=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderDashboard(); renderPharmacies(); renderPlanSelectOptions(); });
+    db.collection("subscriptionPlans").onSnapshot(function(s){ plans=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderPlans(); renderPlanSelectOptions(); });
+    db.collection("activationCodes").onSnapshot(function(s){ activationCodes=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderActivationCodes(); });
+    db.collection("features").onSnapshot(function(s){ features=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderFeatures(); });
+    db.collection("accessCodes").orderBy("createdAt","desc").onSnapshot(function(s){ accessCodes=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderAccessCodes(); });
+    db.collection("ads").orderBy("createdAt","desc").onSnapshot(function(s){ ads=s.docs.map(function(d){return Object.assign({id:d.id},d.data());}); renderAds(); });
+
+    document.getElementById("closePharmacyOverlay").onclick=function(){ document.getElementById("pharmacyOverlay").classList.remove("open"); };
+    document.getElementById("pharmacyOverlay").onclick=function(e){ if(e.target===this) this.classList.remove("open"); };
+
+    renderAccessTab();
+  }
+
+  // ================= لوحة الإحصائيات =================
+  function renderDashboard(){
+    var el = document.getElementById("tab-dashboard");
+    var activeCount = pharmacies.filter(function(p){return isSubscriptionActive(p.subscription);}).length;
+    var expiringSoon = pharmacies.filter(function(p){return isSubscriptionActive(p.subscription) && remainingDays(p.subscription.endDate)<=7;}).length;
+
+    el.innerHTML =
+      '<div class="stat-row">'+
+        '<div class="stat-card"><div class="value">'+pharmacies.length+'</div><div class="label">إجمالي الصيدليات</div></div>'+
+        '<div class="stat-card"><div class="value">'+activeCount+'</div><div class="label">اشتراكات فعّالة</div></div>'+
+        '<div class="stat-card"><div class="value">'+expiringSoon+'</div><div class="label">تنتهي خلال 7 أيام</div></div>'+
+      '</div>'+
+      '<div id="pharmStatsList"></div>';
+
+    var list = document.getElementById("pharmStatsList");
+    if(!pharmacies.length){ list.innerHTML='<div class="empty-state">لا توجد صيدليات مسجلة بعد.</div>'; return; }
+
+    list.innerHTML = pharmacies.map(function(p){
+      var active = isSubscriptionActive(p.subscription);
+      return '<div class="card" style="padding:14px; margin-bottom:10px;">'+
+        '<b>'+escapeHtml(p.name)+'</b>'+
+        '<p style="font-size:12px; color:var(--ink-faint); margin:4px 0 8px;">'+escapeHtml([p.province,p.district,p.neighborhood].filter(Boolean).join(' — '))+'</p>'+
+        '<div style="display:flex; gap:8px; flex-wrap:wrap;">'+
+          '<span class="chip chip-muted" data-sub-count="'+p.id+'">جارٍ العد...</span>'+
+          '<span class="chip '+(active?'':'chip-danger')+'">'+(active?('متبقي '+remainingDays(p.subscription.endDate)+' يوم'):'لا يوجد اشتراك فعّال')+'</span>'+
+        '</div></div>';
+    }).join("");
+
+    pharmacies.forEach(function(p){
+      db.collection("pharmacies").doc(p.id).collection("subEmails").get().then(function(snap){
+        var badge = list.querySelector('[data-sub-count="'+p.id+'"]');
+        if(badge) badge.textContent = "إيميلات فرعية: "+snap.size+" / "+p.maxSubEmails;
+      });
+    });
+  }
+
+  // ================= الصيدليات =================
+  function renderPharmacies(){
+    var el = document.getElementById("tab-pharmacies");
+    if(!pharmacies.length){ el.innerHTML='<div class="empty-state">لا توجد صيدليات بعد.</div>'; return; }
+    el.innerHTML = '<div class="card">'+pharmacies.map(function(p){
+      var active = isSubscriptionActive(p.subscription);
+      return '<div class="row" data-id="'+p.id+'">'+
+        '<div class="avatar">'+escapeHtml((p.name||"؟").charAt(0))+'</div>'+
+        '<div style="flex:1;"><b>'+escapeHtml(p.name)+'</b><p style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">'+escapeHtml(p.ownerEmail)+'</p></div>'+
+        '<span class="chip '+(active?'':'chip-muted')+'">'+(active?'فعّال':'غير فعّال')+'</span></div>';
+    }).join("")+'</div>';
+    el.querySelectorAll(".row").forEach(function(row){ row.onclick=function(){ openPharmacyDetail(row.getAttribute("data-id")); }; });
+  }
+
+  function openPharmacyDetail(id){
+    currentPharmacyDetailId = id;
+    renderPharmacyDetailBody();
+    document.getElementById("pharmacyOverlay").classList.add("open");
+  }
+
+  async function renderPharmacyDetailBody(){
+    var p = pharmacies.find(function(x){return x.id===currentPharmacyDetailId;});
+    if(!p) return;
+    var body = document.getElementById("pharmacyOverlayBody");
+    var subEmailsSnap = await db.collection("pharmacies").doc(p.id).collection("subEmails").get();
+
+    body.innerHTML =
+      '<p style="font-size:16px; font-weight:700; margin:0;">'+escapeHtml(p.name)+'</p>'+
+      '<p style="color:var(--ink-faint); margin:2px 0 20px;">'+escapeHtml(p.ownerEmail)+'</p>'+
+      '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">حالة الاشتراك</p>'+
+      '<div style="display:flex; gap:8px; margin-bottom:8px;" id="subStatusButtons">'+
+        ['active','expired','none'].map(function(s){
+          return '<button type="button" class="chip '+(p.subscription.status===s?'':'chip-muted')+'" data-status="'+s+'" style="cursor:pointer; border:none;">'+s+'</button>';
+        }).join("")+
+      '</div>'+
+      (p.subscription.endDate ? '<p style="font-size:13px; color:var(--ink-faint);">ينتهي: متبقي '+remainingDays(p.subscription.endDate)+' يوم</p>' : '')+
+      '<div style="border-top:1px solid var(--line-soft); margin:18px 0; padding-top:18px;">'+
+        '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">الحد الأقصى للإيميلات الفرعية</p>'+
+        '<div style="display:flex; gap:8px;"><input type="text" id="maxSubEmailsInput" value="'+p.maxSubEmails+'" style="flex:1; height:40px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 12px; background:var(--bg);"><button class="btn btn-ghost" id="saveMaxSubEmails">حفظ</button></div>'+
+      '</div>'+
+      '<div style="border-top:1px solid var(--line-soft); margin:18px 0; padding-top:18px;">'+
+        '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">الإيميلات الفرعية ('+subEmailsSnap.size+')</p>'+
+        (subEmailsSnap.empty ? '<p style="color:var(--ink-faint); font-size:13px;">لا توجد إيميلات فرعية.</p>' :
+          subEmailsSnap.docs.map(function(d){
+            return '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line-soft);"><span class="num">'+escapeHtml(d.id)+'</span><button class="btn btn-icon btn-danger-ghost" data-del-sub="'+d.id+'">✕</button></div>';
+          }).join(""))+
+      '</div>';
+
+    body.querySelectorAll("[data-status]").forEach(function(btn){
+      btn.onclick=async function(){
+        var newSub = Object.assign({}, p.subscription, {status:btn.getAttribute("data-status")});
+        await db.collection("pharmacies").doc(p.id).update({subscription:newSub});
+        showToast("تم تحديث حالة الاشتراك");
+      };
+    });
+    document.getElementById("saveMaxSubEmails").onclick=async function(){
+      var v = parseInt(document.getElementById("maxSubEmailsInput").value,10);
+      if(isNaN(v)||v<0) return;
+      await db.collection("pharmacies").doc(p.id).update({maxSubEmails:v});
+      showToast("تم الحفظ");
+    };
+    body.querySelectorAll("[data-del-sub]").forEach(function(btn){
+      btn.onclick=async function(){
+        await db.collection("pharmacies").doc(p.id).collection("subEmails").doc(btn.getAttribute("data-del-sub")).delete();
+        renderPharmacyDetailBody();
+      };
+    });
+  }
+
+  // ================= خطط الاشتراك ورموز التفعيل =================
+  function renderPlanSelectOptions(){
+    var sel = document.getElementById("codePlanSelect");
+    if(sel) sel.innerHTML = plans.map(function(pl){ return '<option value="'+pl.id+'">'+escapeHtml(pl.name)+'</option>'; }).join("");
+  }
+
+  function renderPlans(){
+    var el = document.getElementById("tab-plans");
+    el.innerHTML =
+      '<div class="mini-form">'+
+        '<p style="font-weight:700; margin:0 0 12px;">خطة اشتراك جديدة</p>'+
+        '<div class="field"><label>اسم الخطة</label><input type="text" id="planNameInput"></div>'+
+        '<label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:14px;"><input type="checkbox" id="planRemoveAds"> إخفاء الإعلانات لهذه الخطة</label>'+
+        '<button class="btn btn-primary" id="createPlanBtn">إنشاء الخطة</button>'+
+      '</div>'+
+      '<p style="font-weight:700; font-size:13px; color:var(--ink-faint); margin-bottom:10px;">الخطط الحالية</p>'+
+      '<div class="card" style="margin-bottom:26px;">'+
+        (plans.length ? plans.map(function(pl){
+          return '<div class="row" style="cursor:default;"><b>'+escapeHtml(pl.name)+'</b>'+(pl.removeAds?'<span class="chip">بدون إعلانات</span>':'')+'</div>';
+        }).join("") : '<div class="empty-state">لا توجد خطط بعد.</div>')+
+      '</div>'+
+      '<div class="mini-form">'+
+        '<p style="font-weight:700; margin:0 0 12px;">رمز تفعيل جديد</p>'+
+        '<div class="field"><label>الخطة</label><select id="codePlanSelect"></select></div>'+
+        '<div style="display:flex; gap:10px;">'+
+          '<div class="field" style="flex:1;"><label>مدة الاشتراك (يوم)</label><input type="number" id="codeDuration" value="30"></div>'+
+          '<div class="field" style="flex:1;"><label>الحد الأقصى للاستخدام</label><input type="number" id="codeMaxUses" value="1"></div>'+
+        '</div>'+
+        '<button class="btn btn-primary" id="createCodeBtn">إنشاء رمز التفعيل</button>'+
+      '</div>'+
+      '<p style="font-weight:700; font-size:13px; color:var(--ink-faint); margin-bottom:10px;">رموز التفعيل الحالية</p>'+
+      '<div class="card" id="activationCodesList"></div>';
+
+    renderPlanSelectOptions();
+
+    document.getElementById("createPlanBtn").onclick=async function(){
+      var name = document.getElementById("planNameInput").value.trim();
+      if(!name) return;
+      await db.collection("subscriptionPlans").add({
+        name:name, features:[], removeAds:document.getElementById("planRemoveAds").checked,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast("تم إنشاء الخطة");
+    };
+    document.getElementById("createCodeBtn").onclick=async function(){
+      var planId = document.getElementById("codePlanSelect").value;
+      var duration = parseInt(document.getElementById("codeDuration").value,10);
+      var maxUses = parseInt(document.getElementById("codeMaxUses").value,10);
+      if(!planId||!duration||!maxUses) { showToast("أنشئ خطة أولاً واملأ الحقول", true); return; }
+      var code = generateRandomCode();
+      await db.collection("activationCodes").doc(code).set({
+        planId:planId, durationDays:duration, maxUses:maxUses, usedCount:0,
+        expiresAt:null, isCancelled:false, usageLog:[], createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast("تم إنشاء الرمز: "+code);
+    };
+    renderActivationCodes();
+  }
+
+  function renderActivationCodes(){
+    var list = document.getElementById("activationCodesList");
+    if(!list) return;
+    if(!activationCodes.length){ list.innerHTML='<div class="empty-state">لا توجد رموز بعد.</div>'; return; }
+    list.innerHTML = activationCodes.map(function(c){
+      var plan = plans.find(function(p){return p.id===c.planId;});
+      return '<div class="row" style="cursor:default;"><span class="num" style="font-weight:700;">'+c.id+'</span>'+
+        '<span style="flex:1; font-size:12.5px; color:var(--ink-faint);">'+escapeHtml(plan?plan.name:c.planId)+' — '+c.durationDays+' يوم — '+c.usedCount+'/'+c.maxUses+'</span>'+
+        (c.isCancelled?'<span class="chip chip-muted">ملغى</span>':'<button class="btn btn-ghost" data-cancel-code="'+c.id+'">إلغاء</button>')+
+        '</div>';
+    }).join("");
+    list.querySelectorAll("[data-cancel-code]").forEach(function(btn){
+      btn.onclick=function(){ db.collection("activationCodes").doc(btn.getAttribute("data-cancel-code")).update({isCancelled:true}); };
+    });
+  }
+
+  // ================= الميزات =================
+  function renderFeatures(){
+    var el = document.getElementById("tab-features");
+    el.innerHTML =
+      '<div class="mini-form">'+
+        '<p style="font-weight:700; margin:0 0 12px;">ميزة جديدة</p>'+
+        '<div class="field"><label>المفتاح البرمجي (key)</label><input type="text" id="featKeyInput" placeholder="مثال: ads_system"></div>'+
+        '<div class="field"><label>الاسم</label><input type="text" id="featNameInput"></div>'+
+        '<div class="field"><label>الوصف</label><input type="text" id="featDescInput"></div>'+
+        '<button class="btn btn-primary" id="createFeatureBtn">إضافة</button>'+
+      '</div>'+
+      '<div id="featuresList"></div>';
+
+    document.getElementById("createFeatureBtn").onclick=async function(){
+      var key=document.getElementById("featKeyInput").value.trim();
+      var name=document.getElementById("featNameInput").value.trim();
+      if(!key||!name) return;
+      await db.collection("features").add({key:key, name:name, description:document.getElementById("featDescInput").value.trim(), enabledGlobally:false, linkedPlanIds:[]});
+      showToast("تمت الإضافة");
+    };
+    renderFeaturesList();
+  }
+
+  function renderFeaturesList(){
+    var list = document.getElementById("featuresList");
+    if(!list) return;
+    if(!features.length){ list.innerHTML='<div class="empty-state">لا توجد ميزات بعد.</div>'; return; }
+    list.innerHTML = features.map(function(f){
+      return '<div class="card" style="padding:14px; margin-bottom:10px;">'+
+        '<div style="display:flex; justify-content:space-between; align-items:center;">'+
+          '<div><b>'+escapeHtml(f.name)+'</b><p class="num" style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">'+escapeHtml(f.key)+'</p></div>'+
+          '<label class="switch"><input type="checkbox" '+(f.enabledGlobally?'checked':'')+' data-toggle-feat="'+f.id+'"><span class="switch-track"></span></label>'+
+        '</div>'+
+        (f.description?'<p style="font-size:13px; color:var(--ink-faint); margin:8px 0;">'+escapeHtml(f.description)+'</p>':'')+
+        '<p style="font-size:12px; font-weight:700; margin:10px 0 6px;">الخطط المرتبطة:</p>'+
+        '<div style="display:flex; flex-wrap:wrap; gap:6px;">'+
+          (plans.length ? plans.map(function(pl){
+            var linked = (f.linkedPlanIds||[]).indexOf(pl.id) > -1;
+            return '<button type="button" class="chip '+(linked?'':'chip-muted')+'" data-link-feat="'+f.id+'" data-link-plan="'+pl.id+'" style="border:none; cursor:pointer;">'+escapeHtml(pl.name)+'</button>';
+          }).join("") : '<span style="font-size:12px; color:var(--ink-faint);">لا توجد خطط بعد.</span>')+
+        '</div></div>';
+    }).join("");
+
+    list.querySelectorAll("[data-toggle-feat]").forEach(function(cb){
+      cb.onchange=function(){ db.collection("features").doc(cb.getAttribute("data-toggle-feat")).update({enabledGlobally:cb.checked}); };
+    });
+    list.querySelectorAll("[data-link-feat]").forEach(function(btn){
+      btn.onclick=async function(){
+        var featId = btn.getAttribute("data-link-feat"), planId = btn.getAttribute("data-link-plan");
+        var f = features.find(function(x){return x.id===featId;});
+        var linked = (f.linkedPlanIds||[]).slice();
+        var idx = linked.indexOf(planId);
+        if(idx>-1) linked.splice(idx,1); else linked.push(planId);
+        await db.collection("features").doc(featId).update({linkedPlanIds:linked});
+      };
+    });
+  }
+
+  // ================= رموز فتح التطبيق =================
+  function renderAccessTab(){
+    var el = document.getElementById("tab-access");
+    el.innerHTML =
+      '<div class="mini-form">'+
+        '<p style="font-weight:700; margin:0 0 12px;">رمز فتح جديد</p>'+
+        '<div style="display:flex; gap:10px;">'+
+          '<div class="field" style="flex:1;"><label>المدة (يوم)</label><input type="number" id="accDuration" value="30"></div>'+
+          '<div class="field" style="flex:1;"><label>عدد الاستخدامات</label><input type="number" id="accMaxUses" value="1"></div>'+
+        '</div>'+
+        '<button class="btn btn-primary" id="createAccessCodeBtn">إنشاء</button>'+
+      '</div>'+
+      '<div class="card" id="accessCodesList"></div>';
+
+    document.getElementById("createAccessCodeBtn").onclick=async function(){
+      var duration=parseInt(document.getElementById("accDuration").value,10);
+      var maxUses=parseInt(document.getElementById("accMaxUses").value,10);
+      if(!duration||!maxUses) return;
+      var code = generateRandomCode();
+      await db.collection("accessCodes").doc(code).set({
+        durationDays:duration, maxUses:maxUses, usedCount:0, usedByEmails:[], isCancelled:false,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      showToast("تم إنشاء الرمز: "+code);
+    };
+    renderAccessCodes();
+  }
+  function renderAccessCodes(){
+    var list = document.getElementById("accessCodesList");
+    if(!list) return;
+    if(!accessCodes.length){ list.innerHTML='<div class="empty-state">لا توجد رموز بعد.</div>'; return; }
+    list.innerHTML = accessCodes.map(function(c){
+      return '<div class="row" style="cursor:default;"><span class="num" style="font-weight:700;">'+c.id+'</span>'+
+        '<span style="flex:1; font-size:12.5px; color:var(--ink-faint);">'+c.durationDays+' يوم — '+c.usedCount+'/'+c.maxUses+'</span>'+
+        (c.isCancelled?'<span class="chip chip-muted">ملغى</span>':'<button class="btn btn-ghost" data-cancel-acc="'+c.id+'">إلغاء</button>')+'</div>';
+    }).join("");
+    list.querySelectorAll("[data-cancel-acc]").forEach(function(btn){
+      btn.onclick=function(){ db.collection("accessCodes").doc(btn.getAttribute("data-cancel-acc")).update({isCancelled:true}); };
+    });
+  }
+
+  // ================= الإعلانات =================
+  function renderAds(){
+    var el = document.getElementById("tab-ads");
+    if(!el.dataset.built){
+      el.innerHTML =
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">'+
+          '<button class="btn btn-primary" id="newAdBtn">+ إعلان جديد</button>'+
+          '<button class="btn btn-ghost" id="adSettingsBtn">إعدادات الإعلانات</button>'+
+        '</div>'+
+        '<div id="adsList"></div>';
+      el.dataset.built = "1";
+      document.getElementById("newAdBtn").onclick=function(){ openAdEditor(null); };
+      document.getElementById("adSettingsBtn").onclick=openAdSettings;
+    }
+    var list = document.getElementById("adsList");
+    if(!ads.length){ list.innerHTML='<div class="empty-state">لا توجد إعلانات بعد.</div>'; return; }
+    list.innerHTML = ads.map(function(ad){
+      var kind = ad.imageUrl ? 'صورة' : (ad.videoUrl ? 'فيديو' : 'نص');
+      return '<div class="card" style="padding:14px; margin-bottom:10px;">'+
+        '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">'+
+          '<div style="flex:1; min-width:0; cursor:pointer;" data-edit-ad="'+ad.id+'"><b>'+escapeHtml(ad.text||kind)+'</b>'+
+          '<p style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">'+((ad.targetProvinces&&ad.targetProvinces.length)?escapeHtml(ad.targetProvinces.join('، ')):'كل المحافظات')+' — '+(ad.totalViews||0)+' مشاهدة</p></div>'+
+          '<label class="switch"><input type="checkbox" '+(ad.active?'checked':'')+' data-toggle-ad="'+ad.id+'"><span class="switch-track"></span></label>'+
+          '<button class="btn btn-icon btn-danger-ghost" data-del-ad="'+ad.id+'">✕</button>'+
+        '</div></div>';
+    }).join("");
+    list.querySelectorAll("[data-edit-ad]").forEach(function(d){ d.onclick=function(){ openAdEditor(d.getAttribute("data-edit-ad")); }; });
+    list.querySelectorAll("[data-toggle-ad]").forEach(function(cb){ cb.onchange=function(){ db.collection("ads").doc(cb.getAttribute("data-toggle-ad")).update({active:cb.checked}); }; });
+    list.querySelectorAll("[data-del-ad]").forEach(function(btn){ btn.onclick=function(){ if(confirm("حذف هذا الإعلان؟")) db.collection("ads").doc(btn.getAttribute("data-del-ad")).delete(); }; });
+  }
+
+  function openAdEditor(adId){
+    editingAdId = adId;
+    var ad = adId ? ads.find(function(a){return a.id===adId;}) : null;
+    document.getElementById("adEditorTitle").textContent = ad ? "تعديل الإعلان" : "إعلان جديد";
+    document.getElementById("adVideoUrl").value = ad ? (ad.videoUrl||"") : "";
+    document.getElementById("adText").value = ad ? (ad.text||"") : "";
+    adTargetProvinces = ad ? (ad.targetProvinces||[]).slice() : [];
+    adImageFile = null;
+    adExistingImageUrl = ad ? (ad.imageUrl||null) : null;
+    document.getElementById("adImagePreview").innerHTML = adExistingImageUrl ? '<img src="'+adExistingImageUrl+'" style="max-width:100%; border-radius:8px;">' : "";
+    renderProvinceChips();
+    document.getElementById("adOverlayModal").classList.add("open");
+  }
+  function renderProvinceChips(){
+    var box = document.getElementById("adProvinceChips");
+    box.innerHTML = adTargetProvinces.map(function(p){ return '<span class="chip" data-remove-province="'+escapeHtml(p)+'" style="cursor:pointer;">'+escapeHtml(p)+' ✕</span>'; }).join("");
+    box.querySelectorAll("[data-remove-province]").forEach(function(c){
+      c.onclick=function(){ adTargetProvinces = adTargetProvinces.filter(function(p){return p!==c.getAttribute("data-remove-province");}); renderProvinceChips(); };
+    });
+  }
+  document.getElementById("addProvinceBtn").onclick=function(){
+    var input = document.getElementById("adProvinceInput");
+    var v = input.value.trim();
+    if(v && adTargetProvinces.indexOf(v)===-1){ adTargetProvinces.push(v); input.value=""; renderProvinceChips(); }
+  };
+  document.getElementById("adImageInput").onchange=function(){
+    var f = this.files && this.files[0]; if(!f) return;
+    adImageFile = f;
+    var reader = new FileReader();
+    reader.onload=function(){ document.getElementById("adImagePreview").innerHTML='<img src="'+reader.result+'" style="max-width:100%; border-radius:8px;">'; };
+    reader.readAsDataURL(f);
+  };
+  document.getElementById("closeAdEditor").onclick=function(){ document.getElementById("adOverlayModal").classList.remove("open"); };
+  document.getElementById("cancelAdEditor").onclick=function(){ document.getElementById("adOverlayModal").classList.remove("open"); };
+  document.getElementById("saveAdBtn").onclick=async function(){
+    var data = {
+      videoUrl: document.getElementById("adVideoUrl").value.trim()||null,
+      text: document.getElementById("adText").value.trim()||null,
+      targetProvinces: adTargetProvinces
+    };
+    try{
+      var ref;
+      if(editingAdId){ ref = db.collection("ads").doc(editingAdId); await ref.update(data); }
+      else { data.active=true; data.totalViews=0; data.imageUrl=null; data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); ref = await db.collection("ads").add(data); editingAdId = ref.id; }
+
+      if(adImageFile){
+        var blob = await compressImage(adImageFile, 1000);
+        var storageRef = storage.ref().child("ads/"+editingAdId+"/image.jpg");
+        await storageRef.put(blob);
+        var url = await storageRef.getDownloadURL();
+        await ref.update({imageUrl:url});
+      }
+      document.getElementById("adOverlayModal").classList.remove("open");
+      showToast("تم حفظ الإعلان");
+    }catch(err){ showToast("خطأ: "+err.message, true); }
+  };
+
+  async function openAdSettings(){
+    var doc = await db.collection("adSettings").doc("config").get();
+    var current = doc.exists ? (doc.data().maxViewsPerUser||3) : 3;
+    var v = prompt("الحد الأقصى لعدد مرات ظهور الإعلان لكل مستخدم:", current);
+    if(v===null) return;
+    var n = parseInt(v,10);
+    if(isNaN(n)||n<1) return;
+    await db.collection("adSettings").doc("config").set({maxViewsPerUser:n});
+    showToast("تم الحفظ");
+  }
+
+  // ================= أدوات مساعدة =================
+  function generateRandomCode(){
+    var chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789", out="";
+    for(var i=0;i<8;i++) out += chars.charAt(Math.floor(Math.random()*chars.length));
+    return out;
+  }
+})();
+</script>
+</body>
+</html>

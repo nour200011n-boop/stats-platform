@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>سجلات المراجعين</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  .theme-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .theme-swatch,.lang-option{display:flex; align-items:center; gap:10px; padding:11px 14px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); cursor:pointer; width:100%; font-size:13.5px; font-weight:700; color:var(--ink);}
+  .theme-swatch.active,.lang-option.active{border-color:var(--primary); background:var(--primary-tint); color:var(--primary-dark);}
+  .lang-toggle{display:flex; border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:20px;}
+  .lang-toggle .lang-option{border:none; border-radius:0; flex:1; justify-content:center;}
+  .lang-toggle .lang-option + .lang-option{border-inline-start:1px solid var(--line);}
+  .swatch-dot{width:20px; height:20px; border-radius:50%; flex-shrink:0;}
+  .avatar{width:46px; height:46px; border-radius:50%; flex-shrink:0; background:var(--primary-tint); color:var(--primary-dark); display:flex; align-items:center; justify-content:center; font-weight:700; overflow:hidden;}
+  .avatar img,.photo-preview img,.detail-avatar img{width:100%; height:100%; object-fit:cover;}
+  .med-row{background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px 12px 4px; margin-bottom:10px; position:relative;}
+  .med-remove{position:absolute; inset-inline-end:8px; top:8px; width:26px; height:26px; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--ink-faint); display:flex; align-items:center; justify-content:center; cursor:pointer;}
+  .add-med-btn{width:100%; height:40px; border-radius:var(--radius-sm); border:1px dashed var(--line); background:transparent; color:var(--primary-dark); font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;}
+  .photo-preview{width:64px; height:64px; border-radius:50%; background:var(--primary-tint); color:var(--primary-dark); display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--line); flex-shrink:0;}
+  .med-card{background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px 14px; margin-bottom:8px;}
+  .sub-badge{font-size:12px; font-weight:700; padding:4px 10px; border-radius:100px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1z"/><path d="M6 6h12a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/><path d="M9 12h6M9 16h4"/></svg>
+      </div>
+      <span data-i18n="appTitle" id="pharmacyNameLabel">سجلات المراجعين</span>
+    </div>
+    <div style="position:relative; flex:1; min-width:180px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="position:absolute; inset-inline-start:12px; top:50%; transform:translateY(-50%); color:var(--ink-faint);"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchInput" data-i18n-placeholder="searchPlaceholder" placeholder="ابحث بالاسم أو الكنية..." style="width:100%; height:40px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--bg); padding-inline-start:36px; padding-inline-end:12px; font-size:14px; color:var(--ink); outline:none;">
+    </div>
+    <button class="btn btn-primary" id="openAddBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span data-i18n="registerBtn">تسجيل مراجع جديد</span>
+    </button>
+    <button class="btn btn-ghost btn-icon" id="openSettingsBtn" aria-label="settings">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</div>
+
+<main>
+  <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px; padding:0 4px;">
+    <h2 style="font-size:14px; font-weight:700; color:var(--ink-soft); margin:0;" data-i18n="listHeader">قائمة المراجعين</h2>
+    <span id="listCount" style="font-size:13px; color:var(--ink-faint);"></span>
+  </div>
+  <div class="card">
+    <div id="tableBody"></div>
+    <div class="spinner" id="loadingSpinner"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">
+      <h3 id="emptyTitle" style="color:var(--ink); font-size:16px;"></h3>
+      <p id="emptyBody" style="font-size:13.5px;"></p>
+      <button class="btn btn-primary" id="emptyAddBtn" style="margin:16px auto 0;">
+        <span data-i18n="registerBtn">تسجيل مراجع جديد</span>
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- Add / Edit Modal -->
+<div class="overlay" id="formOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3 id="formTitle"></h3>
+      <button class="btn btn-ghost btn-icon" id="closeFormBtn">✕</button>
+    </div>
+    <form id="visitorForm">
+      <div class="modal-body">
+        <div id="photoFieldWrap" style="display:none; align-items:center; gap:14px; margin-bottom:20px;">
+          <div class="photo-preview" id="photoPreview">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </div>
+          <button type="button" class="btn btn-ghost" id="uploadPhotoBtn" data-i18n="choosePhoto">اختيار صورة</button>
+          <input type="file" id="photoInput" accept="image/*" style="display:none;">
+        </div>
+
+        <div class="field" id="field-name">
+          <label><span data-i18n="labelName">اسم المراجع</span> <span style="color:var(--cta);">*</span></label>
+          <input type="text" id="inputName" data-i18n-placeholder="placeholderName">
+          <div class="err-msg" data-i18n="errName"></div>
+        </div>
+        <div class="field">
+          <label data-i18n="labelNickname">الكنية / اللقب</label>
+          <input type="text" id="inputNickname">
+        </div>
+        <div class="field" id="field-phone">
+          <label><span data-i18n="labelPhone">رقم الهاتف</span> <span style="color:var(--cta);">*</span></label>
+          <input type="text" id="inputPhone" inputmode="tel">
+          <div class="err-msg" data-i18n="errPhone"></div>
+        </div>
+        <div class="field">
+          <label data-i18n="labelLandmark">أقرب نقطة دالة</label>
+          <input type="text" id="inputLandmark">
+        </div>
+        <div class="field">
+          <label data-i18n="labelAddress">عنوان السكن</label>
+          <textarea id="inputAddress"></textarea>
+        </div>
+
+        <div style="font-size:13.5px; font-weight:700; margin:20px 0 10px; padding-top:16px; border-top:1px solid var(--line-soft);" data-i18n="medsSectionTitle">العلاجات المستخدمة</div>
+        <div id="medsContainer"></div>
+        <button type="button" class="add-med-btn" id="addMedBtn">+ <span data-i18n="addMedBtn">إضافة دواء</span></button>
+      </div>
+      <div class="modal-foot">
+        <button type="submit" class="btn btn-primary" id="saveVisitorBtn" data-i18n="saveBtn">حفظ البيانات</button>
+        <button type="button" class="btn btn-ghost" id="cancelFormBtn" data-i18n="cancelBtn">إلغاء</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3 data-i18n="detailModalTitle">الملف التعريفي</h3>
+      <button class="btn btn-ghost btn-icon" id="closeDetailBtn">✕</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px; padding:22px 22px 16px;">
+      <div class="detail-avatar avatar" id="detailAvatar" style="width:60px; height:60px; font-size:20px;"></div>
+      <div>
+        <p style="font-size:18px; font-weight:700; margin:0;" id="detailName"></p>
+        <p style="font-size:13px; color:var(--ink-faint); margin:2px 0 0;" id="detailNick"></p>
+      </div>
+    </div>
+    <div style="padding:0 22px 18px;">
+      <p class="err-msg" style="display:block; color:var(--ink-faint); font-size:12px; font-weight:700;" data-i18n="contactSectionLabel">بيانات التواصل والسكن</p>
+      <div style="display:flex; flex-direction:column; gap:10px; font-size:14px;">
+        <div class="num" id="detailPhoneText"></div>
+        <div id="detailAddress"></div>
+        <div id="detailLandmarkWrap"></div>
+      </div>
+    </div>
+    <div style="padding:0 22px 18px;">
+      <p style="color:var(--ink-faint); font-size:12px; font-weight:700;" data-i18n="treatmentSectionLabel">التاريخ العلاجي</p>
+      <div id="detailMeds"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="editFromDetailBtn" data-i18n="editBtn">تعديل البيانات</button>
+      <button class="btn btn-danger-ghost" id="deleteBtn" data-i18n="deleteRecordBtn">حذف السجل</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head"><h3 data-i18n="settingsTitle">الإعدادات</h3>
+      <button class="btn btn-ghost btn-icon" id="closeSettingsBtn">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; font-weight:700; color:var(--ink-faint);" data-i18n="languageLabel">اللغة</p>
+      <div class="lang-toggle" id="langToggle"></div>
+
+      <p style="font-size:12px; font-weight:700; color:var(--ink-faint); margin-bottom:12px;" data-i18n="appearanceLabel">مظهر التطبيق</p>
+      <div class="theme-grid" id="themeGrid" style="margin-bottom:22px;"></div>
+
+      <p style="font-size:12px; font-weight:700; color:var(--ink-faint); margin-bottom:10px;">الاشتراك</p>
+      <div class="card" style="padding:14px; margin-bottom:16px;">
+        <div id="subStatusBox" style="margin-bottom:12px; font-size:13.5px;"></div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="activationCodeInput" placeholder="رمز التفعيل" style="flex:1; height:40px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 12px; background:var(--bg);">
+          <button class="btn btn-ghost" id="activateCodeBtn">تفعيل</button>
+        </div>
+      </div>
+
+      <button class="btn btn-danger-ghost btn-block" id="logoutBtn">تسجيل الخروج</button>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="doneSettingsBtn" data-i18n="doneBtn">تم</button>
+    </div>
+  </div>
+</div>
+
+<datalist id="medFormOptions"></datalist>
+
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="shared.js"></script>
+<script src="platform.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var currentUser = null, pharmacyId = null, pharmacy = null;
+  var visitors = [];
+  var unsubscribeVisitors = null;
+  var editingId = null, detailId = null, currentPhotoFile = null, currentPhotoUrl = null;
+  var currentLang = localStorage.getItem("lang") || "ar";
+  var photoFeatureEnabled = false;
+
+  var T = {
+    ar:{appTitle:"سجلات المراجعين",searchPlaceholder:"ابحث بالاسم أو الكنية...",registerBtn:"تسجيل مراجع جديد",
+      listHeader:"قائمة المراجعين",emptyTitleNone:"لا يوجد مراجعون مسجلون بعد",emptyTitleNoResults:"لا توجد نتائج مطابقة",
+      emptyBodyNone:"ابدأ بتسجيل أول مراجع لإنشاء الأرشيف.",emptyBodyNoResults:"جرّب كلمات بحث أخرى.",
+      formTitleAdd:"تسجيل مراجع جديد",formTitleEdit:"تعديل بيانات المراجع",choosePhoto:"اختيار صورة",
+      labelName:"اسم المراجع",placeholderName:"الاسم الكامل الصريح",errName:"الرجاء إدخال اسم المراجع.",
+      labelNickname:"الكنية / اللقب",labelPhone:"رقم الهاتف",errPhone:"الرجاء إدخال رقم هاتف صحيح.",
+      labelLandmark:"أقرب نقطة دالة",labelAddress:"عنوان السكن",medsSectionTitle:"العلاجات المستخدمة",
+      addMedBtn:"إضافة دواء",medEmpty:"لم تتم إضافة أي علاج بعد",labelSci:"الاسم العلمي",labelTrade:"الاسم التجاري",
+      labelForm:"الشكل الصيدلاني / الجرعة",saveBtn:"حفظ البيانات",cancelBtn:"إلغاء",detailModalTitle:"الملف التعريفي",
+      noNickname:"بلا كنية مسجّلة",contactSectionLabel:"بيانات التواصل والسكن",notRecorded:"غير مسجّل",
+      treatmentSectionLabel:"التاريخ العلاجي",noMeds:"لا توجد أدوية مسجّلة لهذا المراجع.",noSciName:"بلا اسم علمي",
+      editBtn:"تعديل البيانات",deleteRecordBtn:"حذف السجل",settingsTitle:"الإعدادات",languageLabel:"اللغة",
+      appearanceLabel:"مظهر التطبيق",doneBtn:"تم",langArabic:"العربية",langEnglish:"English",
+      themeLight:"فاتح",themeDark:"غامق",countLabel:function(n){return n+" مراجع مسجّل";},
+      deleteConfirm:function(n){return 'هل أنت متأكد من حذف سجل "'+n+'"؟';}},
+    en:{appTitle:"Visitor Records",searchPlaceholder:"Search by name or nickname...",registerBtn:"Register New Visitor",
+      listHeader:"Visitor List",emptyTitleNone:"No visitors registered yet",emptyTitleNoResults:"No matching results",
+      emptyBodyNone:"Start by registering your first visitor.",emptyBodyNoResults:"Try different search terms.",
+      formTitleAdd:"Register New Visitor",formTitleEdit:"Edit Visitor Data",choosePhoto:"Choose Photo",
+      labelName:"Visitor Name",placeholderName:"Full legal name",errName:"Please enter the visitor's name.",
+      labelNickname:"Nickname / Alias",labelPhone:"Phone Number",errPhone:"Please enter a valid phone number.",
+      labelLandmark:"Nearest Landmark",labelAddress:"Home Address",medsSectionTitle:"Current Medications",
+      addMedBtn:"Add Medication",medEmpty:"No medications added yet",labelSci:"Scientific Name",labelTrade:"Trade Name",
+      labelForm:"Form / Dosage",saveBtn:"Save",cancelBtn:"Cancel",detailModalTitle:"Profile",
+      noNickname:"No nickname recorded",contactSectionLabel:"Contact & Residence Info",notRecorded:"Not recorded",
+      treatmentSectionLabel:"Treatment History",noMeds:"No medications recorded.",noSciName:"No scientific name",
+      editBtn:"Edit Data",deleteRecordBtn:"Delete Record",settingsTitle:"Settings",languageLabel:"Language",
+      appearanceLabel:"App Appearance",doneBtn:"Done",langArabic:"العربية",langEnglish:"English",
+      themeLight:"Light",themeDark:"Dark",countLabel:function(n){return n+" visitors registered";},
+      deleteConfirm:function(n){return 'Delete the record for "'+n+'"?';}}
+  };
+  function t(k){ return (T[currentLang]||T.ar)[k] || T.ar[k] || k; }
+  var THEMES=[{id:"light",labelKey:"themeLight"},{id:"dark",labelKey:"themeDark"}];
+  var MED_OPTS={ar:["أقراص","كبسول","شراب","حقنة","مرهم","قطرة"],en:["Tablets","Capsules","Syrup","Injection","Ointment","Drops"]};
+
+  function applyLanguage(lang, persist){
+    currentLang = lang;
+    document.documentElement.setAttribute("lang", lang);
+    document.documentElement.setAttribute("dir", lang==="ar"?"rtl":"ltr");
+    document.querySelectorAll("[data-i18n]").forEach(function(el){ el.textContent = t(el.getAttribute("data-i18n")); });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach(function(el){ el.placeholder = t(el.getAttribute("data-i18n-placeholder")); });
+    var dl = document.getElementById("medFormOptions");
+    dl.innerHTML = MED_OPTS[currentLang].map(function(v){return '<option value="'+escapeHtml(v)+'">';}).join("");
+    renderLangToggle(); renderThemeGrid(); renderList();
+    if(persist) localStorage.setItem("lang", lang);
+  }
+  function renderLangToggle(){
+    var wrap = document.getElementById("langToggle");
+    wrap.innerHTML = [{id:"ar",k:"langArabic"},{id:"en",k:"langEnglish"}].map(function(l){
+      return '<button type="button" class="lang-option'+(l.id===currentLang?" active":"")+'" data-lang="'+l.id+'">'+t(l.k)+'</button>';
+    }).join("");
+    wrap.querySelectorAll(".lang-option").forEach(function(b){ b.onclick=function(){ applyLanguage(b.getAttribute("data-lang"), true); }; });
+  }
+  function renderThemeGrid(){
+    var grid = document.getElementById("themeGrid");
+    var current = localStorage.getItem("theme")||"light";
+    grid.innerHTML = THEMES.map(function(th){
+      return '<button type="button" class="theme-swatch'+(th.id===current?" active":"")+'" data-theme="'+th.id+'">'+t(th.labelKey)+'</button>';
+    }).join("");
+    grid.querySelectorAll(".theme-swatch").forEach(function(b){
+      b.onclick=function(){ setTheme(b.getAttribute("data-theme")); renderThemeGrid(); };
+    });
+  }
+
+  guardPage({ onReady: function(user, userData){
+    currentUser = user;
+    pharmacyId = userData.pharmacyId;
+    loadTheme();
+    init();
+  }});
+
+  async function init(){
+    pharmacy = await getPharmacy(pharmacyId);
+    document.getElementById("pharmacyNameLabel").textContent = pharmacy ? pharmacy.name : t("appTitle");
+    photoFeatureEnabled = await isFeatureEnabledForPharmacy(FEATURE_VISITOR_PHOTO_KEY, pharmacyId);
+    document.getElementById("photoFieldWrap").style.display = photoFeatureEnabled ? "flex" : "none";
+
+    applyLanguage(currentLang, false);
+    listenToVisitors();
+    refreshSubscriptionBox();
+    maybeShowAd();
+  }
+
+  function listenToVisitors(){
+    document.getElementById("loadingSpinner").style.display = "block";
+    unsubscribeVisitors = db.collection("pharmacies").doc(pharmacyId).collection("visitors")
+      .orderBy("name")
+      .onSnapshot(function(snap){
+        document.getElementById("loadingSpinner").style.display = "none";
+        visitors = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+        renderList();
+      }, function(err){
+        document.getElementById("loadingSpinner").style.display = "none";
+        showToast("خطأ بجلب البيانات: " + err.message, true);
+      });
+  }
+
+  function initials(name){ var p=(name||"").trim().split(/\s+/); return p[0]?p[0].charAt(0):"؟"; }
+
+  function renderList(){
+    var q = document.getElementById("searchInput").value.trim();
+    var list = visitors.filter(function(v){ return !q || (v.name&&v.name.includes(q)) || (v.nickname&&v.nickname.includes(q)); });
+    var body = document.getElementById("tableBody"), empty = document.getElementById("emptyState");
+    document.getElementById("listCount").textContent = visitors.length ? t("countLabel")(visitors.length) : "";
+
+    if(!list.length){
+      body.innerHTML = "";
+      empty.style.display = "block";
+      document.getElementById("emptyTitle").textContent = visitors.length ? t("emptyTitleNoResults") : t("emptyTitleNone");
+      document.getElementById("emptyBody").textContent = visitors.length ? t("emptyBodyNoResults") : t("emptyBodyNone");
+      document.getElementById("emptyAddBtn").style.display = visitors.length ? "none" : "inline-flex";
+      return;
+    }
+    empty.style.display = "none";
+    body.innerHTML = list.map(function(v){
+      var avatar = v.photo ? '<img src="'+v.photo+'">' : escapeHtml(initials(v.name));
+      return '<div class="row" data-id="'+v.id+'">'+
+        '<div class="avatar">'+avatar+'</div>'+
+        '<div style="flex:1; min-width:0;"><p style="font-weight:700; margin:0 0 2px;">'+escapeHtml(v.name)+'</p>'+
+        '<p style="font-size:12.5px; color:var(--ink-faint); margin:0; display:flex; gap:10px;">'+
+        (v.nickname?'<span>'+escapeHtml(v.nickname)+'</span>':'')+(v.phone?'<span class="num">'+escapeHtml(v.phone)+'</span>':'')+'</p></div>'+
+        '<span class="chip">'+((v.medications||[]).length)+'</span></div>';
+    }).join("");
+    body.querySelectorAll(".row").forEach(function(row){ row.onclick=function(){ openDetail(row.getAttribute("data-id")); }; });
+  }
+  document.getElementById("searchInput").addEventListener("input", renderList);
+
+  // ---------------- Add/Edit form ----------------
+  var formOverlay=document.getElementById("formOverlay"), detailOverlay=document.getElementById("detailOverlay"), settingsOverlay=document.getElementById("settingsOverlay");
+
+  function openForm(v){
+    editingId = v ? v.id : null;
+    currentPhotoFile = null;
+    currentPhotoUrl = v ? (v.photo||null) : null;
+    document.getElementById("formTitle").textContent = v ? t("formTitleEdit") : t("formTitleAdd");
+    document.getElementById("inputName").value = v ? v.name||"" : "";
+    document.getElementById("inputNickname").value = v ? v.nickname||"" : "";
+    document.getElementById("inputPhone").value = v ? v.phone||"" : "";
+    document.getElementById("inputAddress").value = v ? v.address||"" : "";
+    document.getElementById("inputLandmark").value = v ? v.landmark||"" : "";
+    updatePhotoPreview();
+    document.getElementById("field-name").classList.remove("has-error");
+    document.getElementById("field-phone").classList.remove("has-error");
+
+    var c = document.getElementById("medsContainer"); c.innerHTML="";
+    var meds = (v&&v.medications)||[];
+    if(meds.length) meds.forEach(addMedRow); else showMedsEmpty();
+    formOverlay.classList.add("open");
+  }
+  function closeForm(){ formOverlay.classList.remove("open"); }
+  document.getElementById("openAddBtn").onclick=function(){openForm(null);};
+  document.getElementById("emptyAddBtn").onclick=function(){openForm(null);};
+  document.getElementById("closeFormBtn").onclick=closeForm;
+  document.getElementById("cancelFormBtn").onclick=closeForm;
+  formOverlay.onclick=function(e){ if(e.target===formOverlay) closeForm(); };
+
+  var photoInput=document.getElementById("photoInput");
+  document.getElementById("uploadPhotoBtn").onclick=function(){photoInput.click();};
+  photoInput.onchange=function(){
+    var f=photoInput.files&&photoInput.files[0]; if(!f) return;
+    currentPhotoFile = f;
+    var reader = new FileReader();
+    reader.onload=function(){ currentPhotoUrl = reader.result; updatePhotoPreview(); };
+    reader.readAsDataURL(f);
+  };
+  function updatePhotoPreview(){
+    var box = document.getElementById("photoPreview");
+    box.innerHTML = currentPhotoUrl ? '<img src="'+currentPhotoUrl+'">' :
+      '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  }
+
+  function showMedsEmpty(){ var c=document.getElementById("medsContainer"); if(!c.querySelector(".med-row")) c.innerHTML='<div style="text-align:center; padding:16px; color:var(--ink-faint); font-size:13px; border:1px dashed var(--line); border-radius:var(--radius-sm); margin-bottom:10px;">'+t("medEmpty")+'</div>'; }
+  function clearMedsEmpty(){ var e=document.querySelector("#medsContainer > div:not(.med-row)"); if(e && !e.classList.contains("med-row")) e.remove(); }
+
+  function addMedRow(data){
+    clearMedsEmpty();
+    var c = document.getElementById("medsContainer");
+    var wrap = document.createElement("div"); wrap.className="med-row";
+    wrap.innerHTML = '<button type="button" class="med-remove">✕</button>'+
+      '<div class="field"><label>'+t("labelSci")+'</label><input type="text" class="med-sci"></div>'+
+      '<div class="field"><label>'+t("labelTrade")+'</label><input type="text" class="med-trade"></div>'+
+      '<div class="field"><label>'+t("labelForm")+'</label><input type="text" class="med-form" list="medFormOptions"></div>';
+    wrap.querySelector(".med-remove").onclick=function(){ wrap.remove(); if(!c.querySelector(".med-row")) showMedsEmpty(); };
+    c.appendChild(wrap);
+    if(data){ wrap.querySelector(".med-sci").value=data.scientific||""; wrap.querySelector(".med-trade").value=data.trade||""; wrap.querySelector(".med-form").value=data.form||""; }
+  }
+  document.getElementById("addMedBtn").onclick=function(){addMedRow(null);};
+
+  function collectMeds(){
+    var out=[];
+    document.querySelectorAll("#medsContainer .med-row").forEach(function(row){
+      var s=row.querySelector(".med-sci").value.trim(), tr=row.querySelector(".med-trade").value.trim(), f=row.querySelector(".med-form").value.trim();
+      if(s||tr||f) out.push({scientific:s, trade:tr, form:f});
+    });
+    return out;
+  }
+
+  document.getElementById("visitorForm").addEventListener("submit", async function(e){
+    e.preventDefault();
+    var name=document.getElementById("inputName").value.trim(), phone=document.getElementById("inputPhone").value.trim();
+    var valid=true;
+    document.getElementById("field-name").classList.toggle("has-error", !name); if(!name) valid=false;
+    document.getElementById("field-phone").classList.toggle("has-error", !phone); if(!phone) valid=false;
+    if(!valid) return;
+
+    var btn = document.getElementById("saveVisitorBtn");
+    btn.disabled = true;
+    try{
+      var data = {
+        name:name, nickname:document.getElementById("inputNickname").value.trim(), phone:phone,
+        address:document.getElementById("inputAddress").value.trim(), landmark:document.getElementById("inputLandmark").value.trim(),
+        medications: collectMeds()
+      };
+      var ref;
+      if(editingId){ ref = db.collection("pharmacies").doc(pharmacyId).collection("visitors").doc(editingId); await ref.update(data); }
+      else { ref = await db.collection("pharmacies").doc(pharmacyId).collection("visitors").add(data); editingId = ref.id; }
+
+      if(photoFeatureEnabled && currentPhotoFile){
+        var url = await uploadVisitorPhoto(pharmacyId, editingId, currentPhotoFile);
+        await ref.update({ photo: url });
+      }
+      closeForm();
+      showToast("تم الحفظ بنجاح");
+    }catch(err){ showToast("خطأ: "+err.message, true); }
+    finally{ btn.disabled=false; }
+  });
+
+  // ---------------- Detail ----------------
+  function openDetail(id){
+    var v = visitors.find(function(x){return x.id===id;}); if(!v) return;
+    detailId = id;
+    document.getElementById("detailAvatar").innerHTML = v.photo ? '<img src="'+v.photo+'">' : escapeHtml(initials(v.name));
+    document.getElementById("detailName").textContent = v.name||"";
+    document.getElementById("detailNick").textContent = v.nickname || t("noNickname");
+    document.getElementById("detailPhoneText").textContent = v.phone || t("notRecorded");
+    document.getElementById("detailAddress").textContent = v.address || t("notRecorded");
+    document.getElementById("detailLandmarkWrap").textContent = v.landmark || "";
+    var meds=v.medications||[], box=document.getElementById("detailMeds");
+    box.innerHTML = meds.length ? meds.map(function(m){
+      return '<div class="med-card"><div style="display:flex; justify-content:space-between;"><b>'+escapeHtml(m.scientific||t("noSciName"))+'</b>'+
+        (m.form?'<span class="chip">'+escapeHtml(m.form)+'</span>':'')+'</div>'+(m.trade?'<p style="color:var(--ink-faint); margin:2px 0 0;">'+escapeHtml(m.trade)+'</p>':'')+'</div>';
+    }).join("") : '<p style="color:var(--ink-faint);">'+t("noMeds")+'</p>';
+    detailOverlay.classList.add("open");
+  }
+  function closeDetail(){ detailOverlay.classList.remove("open"); detailId=null; }
+  document.getElementById("closeDetailBtn").onclick=closeDetail;
+  detailOverlay.onclick=function(e){ if(e.target===detailOverlay) closeDetail(); };
+  document.getElementById("editFromDetailBtn").onclick=function(){
+    var v=visitors.find(function(x){return x.id===detailId;}); closeDetail(); if(v) openForm(v);
+  };
+  document.getElementById("deleteBtn").onclick=async function(){
+    var v=visitors.find(function(x){return x.id===detailId;});
+    if(!confirm(t("deleteConfirm")(v?v.name:""))) return;
+    await db.collection("pharmacies").doc(pharmacyId).collection("visitors").doc(detailId).delete();
+    closeDetail();
+  };
+
+  // ---------------- Settings ----------------
+  document.getElementById("openSettingsBtn").onclick=function(){ renderLangToggle(); renderThemeGrid(); settingsOverlay.classList.add("open"); };
+  document.getElementById("closeSettingsBtn").onclick=function(){ settingsOverlay.classList.remove("open"); };
+  document.getElementById("doneSettingsBtn").onclick=function(){ settingsOverlay.classList.remove("open"); };
+  settingsOverlay.onclick=function(e){ if(e.target===settingsOverlay) settingsOverlay.classList.remove("open"); };
+  document.getElementById("logoutBtn").onclick=function(){ auth.signOut().then(function(){ window.location.href="index.html"; }); };
+
+  async function refreshSubscriptionBox(){
+    pharmacy = await getPharmacy(pharmacyId);
+    var box = document.getElementById("subStatusBox");
+    var active = isSubscriptionActive(pharmacy.subscription);
+    var days = remainingDays(pharmacy.subscription.endDate);
+    box.innerHTML = active
+      ? '<span class="sub-badge" style="background:var(--primary-tint); color:var(--primary-dark);">فعّال — متبقي '+days+' يوم</span>'
+      : '<span class="sub-badge" style="background:var(--danger-tint); color:var(--danger);">لا يوجد اشتراك فعّال</span>';
+  }
+  document.getElementById("activateCodeBtn").onclick=async function(){
+    var code = document.getElementById("activationCodeInput").value.trim().toUpperCase();
+    if(!code) return;
+    var btn=this; btn.disabled=true;
+    try{
+      var r = await activateSubscriptionCode(code, pharmacyId);
+      showToast(r.queued ? "تم حجز الاشتراك القادم" : "تم تفعيل الاشتراك بنجاح");
+      document.getElementById("activationCodeInput").value = "";
+      refreshSubscriptionBox();
+    }catch(err){ showToast(err.message, true); }
+    finally{ btn.disabled=false; }
+  };
+
+  // ---------------- Ad overlay ----------------
+  async function maybeShowAd(){
+    try{
+      var ad = await getAdToShow(pharmacyId);
+      if(!ad) return;
+      showAdOverlay(ad);
+    }catch(e){ /* صامت — لا نمنع استخدام التطبيق بسبب خطأ بالإعلانات */ }
+  }
+  function showAdOverlay(ad){
+    recordAdView(ad.id);
+    var overlay = document.createElement("div");
+    overlay.className = "ad-overlay";
+    var contentHtml = ad.imageUrl ? '<img src="'+ad.imageUrl+'">' :
+      (ad.videoUrl ? '<video src="'+ad.videoUrl+'" autoplay muted playsinline style="max-width:100%; max-height:90vh;"></video>' :
+      '<div class="ad-text">'+escapeHtml(ad.text||"")+'</div>');
+    overlay.innerHTML = '<div class="ad-close" id="adCloseBtn">5</div><div class="ad-content">'+contentHtml+'</div>';
+    document.body.appendChild(overlay);
+    var remaining=5;
+    var closeBtn = overlay.querySelector("#adCloseBtn");
+    var timer = setInterval(function(){
+      remaining--;
+      if(remaining<=0){ clearInterval(timer); closeBtn.textContent="✕"; closeBtn.classList.add("ready"); }
+      else closeBtn.textContent = remaining;
+    }, 1000);
+    closeBtn.onclick=function(){ if(remaining<=0) overlay.remove(); };
+  }
+})();
+</script>
+</body>
+</html>
