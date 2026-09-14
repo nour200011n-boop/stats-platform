@@ -1,11 +1,6 @@
 // ============================================================
-// إعداد Firebase — عدّل القيم أدناه بمعلومات مشروعك الحقيقي
+// إعداد Firebase — بيانات مشروعك الحقيقية
 // ============================================================
-// من أين تحصل عليها:
-// Firebase Console → ⚙️ Project settings → أسفل الصفحة "Your apps"
-// إن لم يكن لديك تطبيق ويب مُسجَّل بعد: اضغط "Add app" واختر أيقونة </>
-// (Web)، سمِّه أي اسم، ثم انسخ كائن firebaseConfig الذي يظهر لك مباشرة
-// إلى هنا (استبدل القيم التالية بالكامل).
 //
 // ملاحظة أمان: هذه القيم ليست سرّية — من الطبيعي والمتوقّع أن تكون
 // مرئية داخل كود الواجهة الأمامية لأي تطبيق ويب. الحماية الفعلية تأتي
@@ -13,12 +8,12 @@
 // القيم.
 
 const firebaseConfig = {
-  apiKey: "ضع_apiKey_هنا",
-  authDomain: "ضع_authDomain_هنا",
-  projectId: "ضع_projectId_هنا",
-  storageBucket: "ضع_storageBucket_هنا",
-  messagingSenderId: "ضع_messagingSenderId_هنا",
-  appId: "ضع_appId_هنا"
+  apiKey: "AIzaSyC7VVvo57P_y2ndWRLo4kmt2TkisT4KmN4",
+  authDomain: "stats-analysis-platform.firebaseapp.com",
+  projectId: "stats-analysis-platform",
+  storageBucket: "stats-analysis-platform.firebasestorage.app",
+  messagingSenderId: "347756276194",
+  appId: "1:347756276194:web:eb2f0162373a075430b1bb"
 };
 
 firebase.initializeApp(firebaseConfig);
