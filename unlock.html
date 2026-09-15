@@ -69,6 +69,16 @@
   "use strict";
   loadTheme();
 
+  // زر/إيماءة الرجوع من هذه الصفحة يجب أن يعيد المستخدم فعلياً لصفحة
+  // تسجيل الدخول (وليس مجرد عرضها ثم إعادة توجيهه تلقائياً لهنا من جديد،
+  // لأن الجلسة لا تزال فعّالة) — لذلك نسجّل خروجه أولاً عند الرجوع.
+  history.pushState({ page: "unlock" }, "", location.href);
+  window.addEventListener("popstate", function(){
+    auth.signOut().then(function(){
+      window.location.href = "index.html";
+    });
+  });
+
   var currentUser = null;
 
   auth.onAuthStateChanged(function(user){
