@@ -1,5 +1,5 @@
 // ============================================================
-// إعداد Firebase — بيانات مشروعك الحقيقية
+// إعداد Firebase — بيانات مشروعك المخصص الجديد (pharmacy-records)
 // ============================================================
 //
 // ملاحظة أمان: هذه القيم ليست سرّية — من الطبيعي والمتوقّع أن تكون
@@ -8,12 +8,12 @@
 // القيم.
 
 const firebaseConfig = {
-  apiKey: "AIzaSyC7VVvo57P_y2ndWRLo4kmt2TkisT4KmN4",
-  authDomain: "stats-analysis-platform.firebaseapp.com",
-  projectId: "stats-analysis-platform",
-  storageBucket: "stats-analysis-platform.firebasestorage.app",
-  messagingSenderId: "347756276194",
-  appId: "1:347756276194:web:eb2f0162373a075430b1bb"
+  apiKey: "AIzaSyBvITUcJRSc5rpE6CIbTkqU5Jt1EAEiqcI",
+  authDomain: "pharmacy-records-6a234.firebaseapp.com",
+  projectId: "pharmacy-records-6a234",
+  storageBucket: "pharmacy-records-6a234.firebasestorage.app",
+  messagingSenderId: "992397049141",
+  appId: "1:992397049141:web:20a04bd0670031b966607c"
 };
 
 firebase.initializeApp(firebaseConfig);
