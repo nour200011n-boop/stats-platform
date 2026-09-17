@@ -7,6 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F6E56">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 </head>
 <body>
 
@@ -42,6 +46,7 @@
 (function(){
   "use strict";
   loadTheme();
+  initConnectivityBanner();
 
   var googleBtn = document.getElementById("googleSignInBtn");
   var googleBtnText = document.getElementById("googleBtnText");
@@ -94,10 +99,7 @@
     }
 
     var data = snap.exists ? snap.data() : { email: user.email };
-    var unlocked = data.unlockedUntil &&
-      (data.unlockedUntil.toDate ? data.unlockedUntil.toDate() : new Date(data.unlockedUntil)) > new Date();
-
-    if(!unlocked || !data.pharmacyId){
+    if(!data.pharmacyId){
       window.location.href = "unlock.html";
     } else {
       window.location.href = "app.html";

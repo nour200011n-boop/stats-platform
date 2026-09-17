@@ -7,6 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F6E56">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <style>
   .tabs{display:flex; gap:8px; overflow-x:auto; padding-bottom:12px; margin-bottom:18px; border-bottom:1px solid var(--line);}
   .tab-btn{flex-shrink:0; height:38px; padding:0 16px; border-radius:100px; border:1px solid var(--line); background:var(--surface); color:var(--ink-soft); font-weight:700; font-size:13.5px; cursor:pointer; white-space:nowrap;}
@@ -43,8 +47,9 @@
     <button class="tab-btn" data-tab="pharmacies">الصيدليات</button>
     <button class="tab-btn" data-tab="plans">الخطط والتفعيل</button>
     <button class="tab-btn" data-tab="features">الميزات</button>
-    <button class="tab-btn" data-tab="access">رموز الفتح</button>
+    <button class="tab-btn" data-tab="access">استمرارية البرنامج</button>
     <button class="tab-btn" data-tab="ads">الإعلانات</button>
+    <button class="tab-btn" data-tab="usage">الاستخدام والتكلفة</button>
   </div>
 
   <div id="tab-dashboard" class="tab-panel"></div>
@@ -53,6 +58,7 @@
   <div id="tab-features" class="tab-panel" style="display:none;"></div>
   <div id="tab-access" class="tab-panel" style="display:none;"></div>
   <div id="tab-ads" class="tab-panel" style="display:none;"></div>
+  <div id="tab-usage" class="tab-panel" style="display:none;"></div>
 </main>
 
 <!-- Pharmacy detail overlay -->
@@ -101,8 +107,9 @@
   "use strict";
   var pharmacies=[], plans=[], activationCodes=[], features=[], accessCodes=[], ads=[];
   var currentPharmacyDetailId = null, editingAdId = null, adTargetProvinces = [], adImageFile = null, adExistingImageUrl = null;
+  var editingPlanId = null;
 
-  guardPage({ requireSuperAdmin:true, onReady:function(){ loadTheme(); init(); } });
+  guardPage({ requireSuperAdmin:true, onReady:function(){ loadTheme(); initConnectivityBanner(); init(); } });
 
   // يُستدعى عند فشل أي مستمع Firestore (غالباً بسبب قواعد أمان غير
   // منشورة بعد، أو مشكلة اتصال) — بدل فشل صامت يترك التبويب فارغاً بلا
@@ -136,6 +143,7 @@
     document.getElementById("pharmacyOverlay").onclick=function(e){ if(e.target===this) this.classList.remove("open"); };
 
     renderAccessTab();
+    renderUsageTab();
   }
 
   // ================= لوحة الإحصائيات =================
@@ -199,21 +207,37 @@
     if(!p) return;
     var body = document.getElementById("pharmacyOverlayBody");
     var subEmailsSnap = await db.collection("pharmacies").doc(p.id).collection("subEmails").get();
+    var currentPlan = plans.find(function(pl){ return pl.id === p.subscription.planId; });
+    var activeNow = p.activeUntil &&
+      (p.activeUntil.toDate ? p.activeUntil.toDate() : new Date(p.activeUntil)) > new Date();
 
     body.innerHTML =
       '<p style="font-size:16px; font-weight:700; margin:0;">'+escapeHtml(p.name)+'</p>'+
       '<p style="color:var(--ink-faint); margin:2px 0 20px;">'+escapeHtml(p.ownerEmail)+'</p>'+
-      '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">حالة الاشتراك</p>'+
-      '<div style="display:flex; gap:8px; margin-bottom:8px;" id="subStatusButtons">'+
-        ['active','expired','none'].map(function(s){
-          return '<button type="button" class="chip '+(p.subscription.status===s?'':'chip-muted')+'" data-status="'+s+'" style="cursor:pointer; border:none;">'+s+'</button>';
-        }).join("")+
+
+      '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">تفعيل استمرارية البرنامج (مستقل عن خطة الاشتراك)</p>'+
+      '<p class="chip '+(activeNow?'':'chip-danger')+'" style="display:inline-block;">'+
+        (activeNow ? ('فعّال — متبقي '+remainingDays(p.activeUntil)+' يوم') : 'غير مفعَّل') +
+      '</p>'+
+
+      '<div style="border-top:1px solid var(--line-soft); margin:18px 0; padding-top:18px;">'+
+        '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">حالة خطة الاشتراك (عدد الإيميلات + الميزات)</p>'+
+        '<div style="display:flex; gap:8px; margin-bottom:8px;" id="subStatusButtons">'+
+          ['active','expired','none'].map(function(s){
+            return '<button type="button" class="chip '+(p.subscription.status===s?'':'chip-muted')+'" data-status="'+s+'" style="cursor:pointer; border:none;">'+s+'</button>';
+          }).join("")+
+        '</div>'+
+        (p.subscription.endDate ? '<p style="font-size:13px; color:var(--ink-faint);">ينتهي: متبقي '+remainingDays(p.subscription.endDate)+' يوم</p>' : '')+
       '</div>'+
-      (p.subscription.endDate ? '<p style="font-size:13px; color:var(--ink-faint);">ينتهي: متبقي '+remainingDays(p.subscription.endDate)+' يوم</p>' : '')+
+
       '<div style="border-top:1px solid var(--line-soft); margin:18px 0; padding-top:18px;">'+
         '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">الحد الأقصى للإيميلات الفرعية</p>'+
-        '<div style="display:flex; gap:8px;"><input type="text" id="maxSubEmailsInput" value="'+p.maxSubEmails+'" style="flex:1; height:40px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 12px; background:var(--bg);"><button class="btn btn-ghost" id="saveMaxSubEmails">حفظ</button></div>'+
+        '<p style="font-size:13.5px; color:var(--ink-faint); margin:0;">'+
+          (p.maxSubEmails || 0) + ' — عبر خطة "' + escapeHtml(currentPlan ? currentPlan.name : 'بلا خطة') + '"' +
+        '</p>'+
+        '<p style="font-size:12px; color:var(--ink-faint); margin-top:4px;">يُحدَّد هذا الرقم من خطة الاشتراك فقط (تبويب "الخطط والتفعيل") — لم يعد قابلاً للتعديل هنا مباشرة.</p>'+
       '</div>'+
+
       '<div style="border-top:1px solid var(--line-soft); margin:18px 0; padding-top:18px;">'+
         '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">الإيميلات الفرعية ('+subEmailsSnap.size+')</p>'+
         (subEmailsSnap.empty ? '<p style="color:var(--ink-faint); font-size:13px;">لا توجد إيميلات فرعية.</p>' :
@@ -229,12 +253,6 @@
         showToast("تم تحديث حالة الاشتراك");
       };
     });
-    document.getElementById("saveMaxSubEmails").onclick=async function(){
-      var v = parseInt(document.getElementById("maxSubEmailsInput").value,10);
-      if(isNaN(v)||v<0) return;
-      await db.collection("pharmacies").doc(p.id).update({maxSubEmails:v});
-      showToast("تم الحفظ");
-    };
     body.querySelectorAll("[data-del-sub]").forEach(function(btn){
       btn.onclick=async function(){
         await db.collection("pharmacies").doc(p.id).collection("subEmails").doc(btn.getAttribute("data-del-sub")).delete();
@@ -255,15 +273,12 @@
       '<div class="mini-form">'+
         '<p style="font-weight:700; margin:0 0 12px;">خطة اشتراك جديدة</p>'+
         '<div class="field"><label>اسم الخطة</label><input type="text" id="planNameInput"></div>'+
+        '<div class="field"><label>الحد الأقصى للإيميلات الفرعية</label><input type="number" id="planMaxSubEmails" value="1"></div>'+
         '<label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:14px;"><input type="checkbox" id="planRemoveAds"> إخفاء الإعلانات لهذه الخطة</label>'+
         '<button class="btn btn-primary" id="createPlanBtn">إنشاء الخطة</button>'+
       '</div>'+
       '<p style="font-weight:700; font-size:13px; color:var(--ink-faint); margin-bottom:10px;">الخطط الحالية</p>'+
-      '<div class="card" style="margin-bottom:26px;">'+
-        (plans.length ? plans.map(function(pl){
-          return '<div class="row" style="cursor:default;"><b>'+escapeHtml(pl.name)+'</b>'+(pl.removeAds?'<span class="chip">بدون إعلانات</span>':'')+'</div>';
-        }).join("") : '<div class="empty-state">لا توجد خطط بعد.</div>')+
-      '</div>'+
+      '<div id="plansListArea" style="margin-bottom:26px;"></div>'+
       '<div class="mini-form">'+
         '<p style="font-weight:700; margin:0 0 12px;">رمز تفعيل جديد</p>'+
         '<div class="field"><label>الخطة</label><select id="codePlanSelect"></select></div>'+
@@ -276,14 +291,16 @@
       '<p style="font-weight:700; font-size:13px; color:var(--ink-faint); margin-bottom:10px;">رموز التفعيل الحالية</p>'+
       '<div class="card" id="activationCodesList"></div>';
 
+    renderPlansList();
     renderPlanSelectOptions();
 
     document.getElementById("createPlanBtn").onclick=async function(){
       var name = document.getElementById("planNameInput").value.trim();
+      var maxSubEmails = parseInt(document.getElementById("planMaxSubEmails").value,10) || 0;
       if(!name) return;
       try{
         await db.collection("subscriptionPlans").add({
-          name:name, features:[], removeAds:document.getElementById("planRemoveAds").checked,
+          name:name, maxSubEmails:maxSubEmails, features:[], removeAds:document.getElementById("planRemoveAds").checked,
           createdAt:firebase.firestore.FieldValue.serverTimestamp()
         });
         showToast("تم إنشاء الخطة");
@@ -304,6 +321,67 @@
       }catch(err){ showToast("تعذّر إنشاء الرمز: "+err.message, true); }
     };
     renderActivationCodes();
+  }
+
+  function renderPlansList(){
+    var area = document.getElementById("plansListArea");
+    if(!area) return;
+    if(!plans.length){ area.innerHTML = '<div class="card"><div class="empty-state">لا توجد خطط بعد.</div></div>'; return; }
+
+    area.innerHTML = '<div class="card">' + plans.map(function(pl){
+      if(editingPlanId === pl.id){
+        return '<div class="row" style="cursor:default; flex-direction:column; align-items:stretch; gap:10px;">'+
+          '<div class="field" style="margin:0;"><label>اسم الخطة</label><input type="text" id="editPlanName" value="'+escapeHtml(pl.name)+'"></div>'+
+          '<div class="field" style="margin:0;"><label>الحد الأقصى للإيميلات الفرعية</label><input type="number" id="editPlanMaxSubEmails" value="'+(pl.maxSubEmails||0)+'"></div>'+
+          '<label style="display:flex; align-items:center; gap:8px; font-size:13px;"><input type="checkbox" id="editPlanRemoveAds" '+(pl.removeAds?'checked':'')+'> إخفاء الإعلانات</label>'+
+          '<div style="display:flex; gap:8px;"><button class="btn btn-primary" data-save-plan="'+pl.id+'">حفظ</button><button class="btn btn-ghost" data-cancel-edit-plan="1">إلغاء</button></div>'+
+        '</div>';
+      }
+      return '<div class="row" style="cursor:default;">'+
+        '<div style="flex:1;"><b>'+escapeHtml(pl.name)+'</b>'+
+          '<p style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">'+(pl.maxSubEmails||0)+' إيميل فرعي'+(pl.removeAds?' — بدون إعلانات':'')+'</p>'+
+        '</div>'+
+        '<button class="btn btn-icon btn-ghost" data-edit-plan="'+pl.id+'">✎</button>'+
+        '<button class="btn btn-icon btn-danger-ghost" data-del-plan="'+pl.id+'">✕</button>'+
+      '</div>';
+    }).join('') + '</div>';
+
+    area.querySelectorAll('[data-edit-plan]').forEach(function(btn){
+      btn.onclick=function(){ editingPlanId = btn.getAttribute('data-edit-plan'); renderPlansList(); };
+    });
+    area.querySelectorAll('[data-cancel-edit-plan]').forEach(function(btn){
+      btn.onclick=function(){ editingPlanId = null; renderPlansList(); };
+    });
+    area.querySelectorAll('[data-save-plan]').forEach(function(btn){
+      btn.onclick=async function(){
+        var id = btn.getAttribute('data-save-plan');
+        var name = document.getElementById('editPlanName').value.trim();
+        var maxSubEmails = parseInt(document.getElementById('editPlanMaxSubEmails').value,10) || 0;
+        var removeAds = document.getElementById('editPlanRemoveAds').checked;
+        if(!name) return;
+        try{
+          await db.collection('subscriptionPlans').doc(id).update({name:name, maxSubEmails:maxSubEmails, removeAds:removeAds});
+          editingPlanId = null;
+          showToast('تم الحفظ — ملاحظة: الصيدليات المفعّلة مسبقاً على هذه الخطة تحتفظ بالعدد القديم حتى إعادة تفعيلها.');
+        }catch(err){ showToast('تعذّر الحفظ: '+err.message, true); }
+      };
+    });
+    area.querySelectorAll('[data-del-plan]').forEach(function(btn){
+      btn.onclick=async function(){
+        var id = btn.getAttribute('data-del-plan');
+        var pl = plans.find(function(x){return x.id===id;});
+        var usedByCount = pharmacies.filter(function(ph){ return ph.subscription && ph.subscription.planId === id; }).length;
+        var warning = usedByCount > 0
+          ? ('⚠️ تحذير: هذه الخطة مستخدمة حالياً من قِبل '+usedByCount+' صيدلية. حذفها لن يُلغي اشتراكها الحالي، لكنك لن تستطيع إنشاء رموز تفعيل جديدة بهذه الخطة بعد الآن.\n\n')
+          : '';
+        var ok = confirm(warning + 'هل أنت متأكد فعلاً من حذف خطة "'+pl.name+'"؟ هذا الإجراء نهائي ولا يمكن التراجع عنه.');
+        if(!ok) return;
+        try{
+          await db.collection('subscriptionPlans').doc(id).delete();
+          showToast('تم حذف الخطة');
+        }catch(err){ showToast('تعذّر الحذف: '+err.message, true); }
+      };
+    });
   }
 
   function renderActivationCodes(){
@@ -386,8 +464,9 @@
   function renderAccessTab(){
     var el = document.getElementById("tab-access");
     el.innerHTML =
+      '<p style="font-size:12.5px; color:var(--ink-faint); margin:0 0 16px;">هذا نظام مستقل تماماً عن "الخطط والتفعيل". هذا الرمز يفعّل استمرار عمل الصيدلية (تسجيل/بحث المراجعين) — وليس عدد الإيميلات الفرعية أو الميزات. الصيدلية تُدخل هذا الرمز بنفسها من صفحة "بيانات الصيدلية" عند أول استخدام، أو عند انتهاء التفعيل من داخل التطبيق مباشرة.</p>'+
       '<div class="mini-form">'+
-        '<p style="font-weight:700; margin:0 0 12px;">رمز فتح جديد</p>'+
+        '<p style="font-weight:700; margin:0 0 12px;">رمز تفعيل جديد</p>'+
         '<div style="display:flex; gap:10px;">'+
           '<div class="field" style="flex:1;"><label>المدة (يوم)</label><input type="number" id="accDuration" value="30"></div>'+
           '<div class="field" style="flex:1;"><label>عدد الاستخدامات</label><input type="number" id="accMaxUses" value="1"></div>'+
@@ -403,7 +482,7 @@
       var code = generateRandomCode();
       try{
         await db.collection("accessCodes").doc(code).set({
-          durationDays:duration, maxUses:maxUses, usedCount:0, usedByEmails:[], isCancelled:false,
+          durationDays:duration, maxUses:maxUses, usedCount:0, usedByPharmacyIds:[], isCancelled:false,
           createdAt:firebase.firestore.FieldValue.serverTimestamp()
         });
         showToast("تم إنشاء الرمز: "+code);
@@ -423,6 +502,113 @@
     list.querySelectorAll("[data-cancel-acc]").forEach(function(btn){
       btn.onclick=function(){ db.collection("accessCodes").doc(btn.getAttribute("data-cancel-acc")).update({isCancelled:true}); };
     });
+  }
+
+  // ================= الاستخدام والتكلفة =================
+  // ملاحظة صادقة: لا توجد أي واجهة برمجية (API) آمنة يمكن لتطبيق الويب
+  // نفسه استخدامها لجلب أرقام الاستخدام أو الفوترة الفعلية من طرف
+  // العميل — بيانات كهذه محمية عمداً خلف صلاحيات حساب Google المالك
+  // للمشروع، ولن تسمح Google بكشفها عبر كود واجهة أمامية (سيتطلب ذلك
+  // وضع بيانات اعتماد حسّاسة داخل الكود الذي يراه أي زائر). لذلك هذا
+  // التبويب يجمع بين رابط مباشر للمصدر الرسمي (Firebase Console)
+  // وحاسبة تكلفة يدوية تُدخل فيها الأرقام التي تراها هناك.
+  function renderUsageTab(){
+    var el = document.getElementById("tab-usage");
+    var projectId = (firebaseConfig && firebaseConfig.projectId) || "";
+    var consoleUrl = projectId
+      ? ("https://console.firebase.google.com/project/" + projectId + "/firestore")
+      : "https://console.firebase.google.com/";
+
+    el.innerHTML =
+      '<div class="card" style="padding:16px; margin-bottom:16px; border-color:var(--danger);">' +
+        '<p style="font-weight:700; margin:0 0 6px; color:var(--danger);">تنبيه مهم بخصوص الصور (منذ فبراير 2026)</p>' +
+        '<p style="font-size:13px; margin:0;">Google عدّلت الشرط: أي استخدام لـ Cloud Storage (صور المراجعين أو الإعلانات) يتطلب الآن ترقية مشروعك لخطة Blaze (الدفع حسب الاستخدام) وربط بطاقة دفع — حتى لو بقي استخدامك ضمن الكمية المجانية فعلياً. Firestore والتوثيق (Authentication) يبقيان مجانيَّين بلا بطاقة. إن كنت تفضّل عدم ربط أي بطاقة إطلاقاً، أبقِ ميزتي رفع الصور (المراجعين والإعلانات) مُعطَّلتين من تبويب "الميزات".</p>' +
+      '</div>' +
+
+      '<div class="card" style="padding:16px; margin-bottom:16px;">' +
+        '<p style="font-weight:700; margin:0 0 10px;">الأرقام الحقيقية من Firebase (المصدر الوحيد الموثوق)</p>' +
+        '<p style="font-size:13px; color:var(--ink-faint); margin:0 0 12px;">افتح Firestore Database في الكونسول ← تبويب Usage أعلى الصفحة، وستجد هناك عدد القراءات/الكتابات/الحذف اليوم فعلياً، ومساحة التخزين المستخدمة.</p>' +
+        '<a href="'+consoleUrl+'" target="_blank" class="btn btn-primary">فتح Firebase Console</a>' +
+      '</div>' +
+
+      '<div class="card" style="padding:16px; margin-bottom:16px;">' +
+        '<p style="font-weight:700; margin:0 0 10px;">الخطة المجانية (Spark) — للمرجع</p>' +
+        '<div style="font-size:13px; line-height:2;">' +
+          '<div>القراءات (Reads): <b>50,000</b> / يوم</div>' +
+          '<div>الكتابات (Writes): <b>20,000</b> / يوم</div>' +
+          '<div>الحذف (Deletes): <b>20,000</b> / يوم</div>' +
+          '<div>التخزين (Firestore): <b>1 GiB</b> إجمالاً</div>' +
+          '<div>نقل البيانات الصادر: <b>10 GiB</b> / شهر</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card" style="padding:16px;">' +
+        '<p style="font-weight:700; margin:0 0 4px;">حاسبة تقدير التكلفة</p>' +
+        '<p style="font-size:12px; color:var(--ink-faint); margin:0 0 14px;">انسخ الأرقام من صفحة Usage في Firebase وضعها هنا — ستحسب الآلة تلقائياً هل تجاوزت الخطة المجانية وبكم تقريباً. أسعار الفائض معبّأة مسبقاً من صفحة تسعير Firestore الرسمية، وهي قابلة للتعديل إن تغيّرت — <a href="https://cloud.google.com/firestore/pricing" target="_blank">تحقّق من السعر الحالي هنا</a>.</p>' +
+
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">' +
+          '<div class="field" style="margin:0;"><label>القراءات اليوم</label><input type="number" id="uReads" value="0"></div>' +
+          '<div class="field" style="margin:0;"><label>الكتابات اليوم</label><input type="number" id="uWrites" value="0"></div>' +
+          '<div class="field" style="margin:0;"><label>الحذف اليوم</label><input type="number" id="uDeletes" value="0"></div>' +
+          '<div class="field" style="margin:0;"><label>التخزين (GiB)</label><input type="number" step="0.01" id="uStorage" value="0"></div>' +
+        '</div>' +
+
+        '<p style="font-weight:700; font-size:12.5px; margin:16px 0 8px;">أسعار الفائض (قابلة للتعديل)</p>' +
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">' +
+          '<div class="field" style="margin:0;"><label>$ لكل 100 ألف قراءة</label><input type="number" step="0.001" id="rReads" value="0.03"></div>' +
+          '<div class="field" style="margin:0;"><label>$ لكل 100 ألف كتابة</label><input type="number" step="0.001" id="rWrites" value="0.09"></div>' +
+          '<div class="field" style="margin:0;"><label>$ لكل 100 ألف حذف</label><input type="number" step="0.001" id="rDeletes" value="0.01"></div>' +
+          '<div class="field" style="margin:0;"><label>$ لكل GiB تخزين/شهر</label><input type="number" step="0.001" id="rStorage" value="0.18"></div>' +
+        '</div>' +
+
+        '<button class="btn btn-primary btn-block" id="calcUsageBtn" style="margin-top:6px;">احسب</button>' +
+        '<div id="usageResult" style="margin-top:16px;"></div>' +
+      '</div>';
+
+    document.getElementById("calcUsageBtn").onclick = function(){
+      var reads = parseFloat(document.getElementById("uReads").value) || 0;
+      var writes = parseFloat(document.getElementById("uWrites").value) || 0;
+      var deletes = parseFloat(document.getElementById("uDeletes").value) || 0;
+      var storage = parseFloat(document.getElementById("uStorage").value) || 0;
+      var rReads = parseFloat(document.getElementById("rReads").value) || 0;
+      var rWrites = parseFloat(document.getElementById("rWrites").value) || 0;
+      var rDeletes = parseFloat(document.getElementById("rDeletes").value) || 0;
+      var rStorage = parseFloat(document.getElementById("rStorage").value) || 0;
+
+      var FREE_READS = 50000, FREE_WRITES = 20000, FREE_DELETES = 20000, FREE_STORAGE = 1;
+
+      var overReads = Math.max(0, reads - FREE_READS);
+      var overWrites = Math.max(0, writes - FREE_WRITES);
+      var overDeletes = Math.max(0, deletes - FREE_DELETES);
+      var overStorage = Math.max(0, storage - FREE_STORAGE);
+
+      var costReads = (overReads / 100000) * rReads;
+      var costWrites = (overWrites / 100000) * rWrites;
+      var costDeletes = (overDeletes / 100000) * rDeletes;
+      var costStorage = overStorage * rStorage;
+      var total = costReads + costWrites + costDeletes + costStorage;
+
+      var withinFree = overReads === 0 && overWrites === 0 && overDeletes === 0 && overStorage === 0;
+
+      var rows = [
+        ["القراءات", reads, FREE_READS, overReads, costReads],
+        ["الكتابات", writes, FREE_WRITES, overWrites, costWrites],
+        ["الحذف", deletes, FREE_DELETES, overDeletes, costDeletes],
+        ["التخزين (GiB)", storage, FREE_STORAGE, overStorage, costStorage]
+      ];
+
+      document.getElementById("usageResult").innerHTML =
+        '<p class="chip" style="background:'+(withinFree?'var(--primary-tint)':'var(--danger-tint)')+'; color:'+(withinFree?'var(--primary-dark)':'var(--danger)')+'; font-size:14px; padding:8px 14px;">' +
+          (withinFree ? '✓ ضمن الخطة المجانية بالكامل' : '⚠ تجاوزت الخطة المجانية — تقدير التكلفة اليومي: $' + total.toFixed(4) + ' (شهرياً تقريباً: $' + (total*30).toFixed(2) + ')') +
+        '</p>' +
+        '<div style="margin-top:10px; font-size:12.5px;">' +
+          rows.map(function(r){
+            return '<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--line-soft);">' +
+              '<span>'+r[0]+'</span><span class="num">'+r[1]+' / '+r[2]+ (r[3]>0 ? ' — فائض '+r[3].toFixed(2)+' ($'+r[4].toFixed(4)+')' : ' ✓') +'</span>' +
+            '</div>';
+          }).join('') +
+        '</div>';
+    };
   }
 
   // ================= الإعلانات =================

@@ -7,6 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F6E56">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 </head>
 <body>
 
@@ -14,25 +18,11 @@
   <div class="card" style="width:100%; max-width:420px;">
     <div class="card-pad">
 
-      <!-- حالة 1: إدخال رمز الفتح -->
-      <div id="unlockStep">
-        <div style="text-align:center; margin-bottom:20px;">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <h2 style="font-size:17px; margin:12px 0 4px;">فتح التطبيق</h2>
-          <p style="font-size:13px; color:var(--ink-faint); margin:0;">أدخل رمز فتح البرنامج الذي حصلت عليه لبدء الاستخدام.</p>
-        </div>
-        <div class="field" id="field-code">
-          <input type="text" id="inputCode" placeholder="رمز الفتح" style="text-align:center; text-transform:uppercase; font-weight:700; letter-spacing:2px;">
-          <div class="err-msg" id="codeErr"></div>
-        </div>
-        <button class="btn btn-primary btn-block" id="redeemBtn">فتح التطبيق</button>
-      </div>
-
-      <!-- حالة 2: إنشاء الصيدلية -->
+      <!-- حالة 1: إنشاء الصيدلية (أول شيء، قبل أي تفعيل) -->
       <div id="setupStep" style="display:none;">
         <div style="text-align:center; margin-bottom:20px;">
           <h2 style="font-size:17px; margin:0 0 4px;">بيانات الصيدلية</h2>
-          <p style="font-size:13px; color:var(--ink-faint); margin:0;">أنشئ ملف صيدليتك لتبدأ بتسجيل المراجعين.</p>
+          <p style="font-size:13px; color:var(--ink-faint); margin:0;">أنشئ ملف صيدليتك أولاً، ثم فعّلها برمز الاشتراك.</p>
         </div>
         <div class="field" id="field-pname">
           <label>اسم الصيدلية</label>
@@ -54,6 +44,20 @@
         <button class="btn btn-primary btn-block" id="createPharmacyBtn">إنشاء الصيدلية والمتابعة</button>
       </div>
 
+      <!-- حالة 2: تفعيل الصيدلية برمز الاشتراك -->
+      <div id="unlockStep" style="display:none;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary);"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <h2 style="font-size:17px; margin:12px 0 4px;">تفعيل الصيدلية</h2>
+          <p style="font-size:13px; color:var(--ink-faint); margin:0;">أدخل رمز الاشتراك الذي حصلت عليه لتفعيل استخدام صيدليتك.</p>
+        </div>
+        <div class="field" id="field-code">
+          <input type="text" id="inputCode" placeholder="رمز الاشتراك" style="text-align:center; text-transform:uppercase; font-weight:700; letter-spacing:2px;">
+          <div class="err-msg" id="codeErr"></div>
+        </div>
+        <button class="btn btn-primary btn-block" id="redeemBtn">تفعيل الصيدلية</button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -64,10 +68,12 @@
 <script src="https://www.gstatic.com/firebasejs/12.18.0/firebase-storage-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="shared.js"></script>
+<script src="platform.js"></script>
 <script>
 (function(){
   "use strict";
   loadTheme();
+  initConnectivityBanner();
 
   // زر/إيماءة الرجوع من هذه الصفحة يجب أن يعيد المستخدم فعلياً لصفحة
   // تسجيل الدخول (وليس مجرد عرضها ثم إعادة توجيهه تلقائياً لهنا من جديد،
@@ -80,6 +86,7 @@
   });
 
   var currentUser = null;
+  var currentPharmacyId = null;
 
   auth.onAuthStateChanged(function(user){
     if(!user){ window.location.href = "index.html"; return; }
@@ -90,77 +97,40 @@
   async function checkState(){
     var snap = await db.collection("users").doc(currentUser.uid).get();
     var data = snap.exists ? snap.data() : {};
-    var unlocked = data.unlockedUntil &&
-      (data.unlockedUntil.toDate ? data.unlockedUntil.toDate() : new Date(data.unlockedUntil)) > new Date();
 
-    if(unlocked && data.pharmacyId){
+    if(!data.pharmacyId){
+      // قبل عرض نموذج "إنشاء صيدلية جديدة": تحقّق هل هذا الإيميل مُضاف
+      // كإيميل فرعي لصيدلية موجودة أصلاً — إن كان كذلك، اربطه بها
+      // تلقائياً بدل جعله ينشئ صيدلية منفصلة بالخطأ.
+      var invitedPharmacyId = await findPharmacyIdForSubEmail(currentUser.email);
+      if(invitedPharmacyId){
+        await db.collection("users").doc(currentUser.uid).set({
+          pharmacyId: invitedPharmacyId, role: "staff"
+        }, { merge: true });
+        showToast("تم ربط حسابك تلقائياً بصيدلية موجودة");
+        checkState();
+        return;
+      }
+      document.getElementById("setupStep").style.display = "block";
+      document.getElementById("unlockStep").style.display = "none";
+      return;
+    }
+
+    currentPharmacyId = data.pharmacyId;
+    var pSnap = await db.collection("pharmacies").doc(currentPharmacyId).get();
+    var pData = pSnap.exists ? pSnap.data() : {};
+    var active = pData.activeUntil &&
+      (pData.activeUntil.toDate ? pData.activeUntil.toDate() : new Date(pData.activeUntil)) > new Date();
+
+    if(active){
       window.location.href = "app.html";
       return;
     }
-    if(unlocked){
-      document.getElementById("unlockStep").style.display = "none";
-      document.getElementById("setupStep").style.display = "block";
-    }
+    document.getElementById("setupStep").style.display = "none";
+    document.getElementById("unlockStep").style.display = "block";
   }
 
-  // ---------------- فك رمز الفتح ----------------
-  document.getElementById("redeemBtn").addEventListener("click", async function(){
-    var codeInput = document.getElementById("inputCode");
-    var code = codeInput.value.trim().toUpperCase();
-    var errBox = document.getElementById("codeErr");
-    var field = document.getElementById("field-code");
-    field.classList.remove("has-error");
-
-    if(!code){
-      field.classList.add("has-error");
-      errBox.textContent = "الرجاء إدخال رمز الفتح.";
-      return;
-    }
-
-    var btn = document.getElementById("redeemBtn");
-    btn.disabled = true;
-    btn.textContent = "...";
-
-    try{
-      await redeemAccessCode(code, currentUser.email, currentUser.uid);
-      showToast("تم فتح التطبيق بنجاح!");
-      document.getElementById("unlockStep").style.display = "none";
-      document.getElementById("setupStep").style.display = "block";
-    }catch(err){
-      field.classList.add("has-error");
-      errBox.textContent = err.message;
-    }finally{
-      btn.disabled = false;
-      btn.textContent = "فتح التطبيق";
-    }
-  });
-
-  async function redeemAccessCode(code, email, uid){
-    var codeRef = db.collection("accessCodes").doc(code);
-    var userRef = db.collection("users").doc(uid);
-
-    return db.runTransaction(async function(t){
-      var codeSnap = await t.get(codeRef);
-      if(!codeSnap.exists) throw new Error("رمز الفتح غير صحيح.");
-      var c = codeSnap.data();
-      if(c.isCancelled) throw new Error("تم إلغاء هذا الرمز.");
-      if((c.usedByEmails || []).indexOf(email) > -1) throw new Error("تم استخدام هذا الرمز مسبقاً بهذا الحساب.");
-      if((c.usedCount || 0) >= c.maxUses) throw new Error("تم استنفاد عدد مرات استخدام هذا الرمز.");
-
-      var unlockedUntil = new Date(Date.now() + c.durationDays * 86400000);
-
-      t.update(codeRef, {
-        usedCount: firebase.firestore.FieldValue.increment(1),
-        usedByEmails: firebase.firestore.FieldValue.arrayUnion(email)
-      });
-      t.set(userRef, {
-        unlockedUntil: firebase.firestore.Timestamp.fromDate(unlockedUntil),
-        accessCodeUsed: code
-      }, { merge: true });
-    });
-  }
-
-  // ---------------- إنشاء الصيدلية ----------------
+  // ---------------- إنشاء الصيدلية (أولاً) ----------------
   document.getElementById("createPharmacyBtn").addEventListener("click", async function(){
     var name = document.getElementById("pName").value.trim();
     var field = document.getElementById("field-pname");
@@ -179,7 +149,8 @@
         province: document.getElementById("pProvince").value.trim(),
         district: document.getElementById("pDistrict").value.trim(),
         neighborhood: document.getElementById("pNeighborhood").value.trim(),
-        maxSubEmails: 1,
+        activeUntil: null,
+        maxSubEmails: 0,
         subscription: { planId: null, status: "none", startDate: null, endDate: null, queuedPlanId: null, queuedDurationDays: null },
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -188,11 +159,44 @@
         role: "owner"
       }, { merge: true });
 
-      window.location.href = "app.html";
+      currentPharmacyId = pharmacyRef.id;
+      document.getElementById("setupStep").style.display = "none";
+      document.getElementById("unlockStep").style.display = "block";
     }catch(err){
       showToast("حدث خطأ: " + err.message, true);
+    }finally{
       btn.disabled = false;
       btn.textContent = "إنشاء الصيدلية والمتابعة";
+    }
+  });
+
+  // ---------------- تفعيل الصيدلية برمز الاشتراك ----------------
+  document.getElementById("redeemBtn").addEventListener("click", async function(){
+    var codeInput = document.getElementById("inputCode");
+    var code = codeInput.value.trim().toUpperCase();
+    var errBox = document.getElementById("codeErr");
+    var field = document.getElementById("field-code");
+    field.classList.remove("has-error");
+
+    if(!code){
+      field.classList.add("has-error");
+      errBox.textContent = "الرجاء إدخال رمز الاشتراك.";
+      return;
+    }
+
+    var btn = document.getElementById("redeemBtn");
+    btn.disabled = true;
+    btn.textContent = "...";
+
+    try{
+      await activatePharmacyAccessCode(code, currentPharmacyId);
+      showToast("تم تفعيل صيدليتك بنجاح!");
+      window.location.href = "app.html";
+    }catch(err){
+      field.classList.add("has-error");
+      errBox.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = "تفعيل الصيدلية";
     }
   });
 })();

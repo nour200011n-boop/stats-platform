@@ -7,6 +7,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F6E56">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
 <style>
   .theme-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .theme-swatch,.lang-option{display:flex; align-items:center; gap:10px; padding:11px 14px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); cursor:pointer; width:100%; font-size:13.5px; font-weight:700; color:var(--ink);}
@@ -42,6 +46,10 @@
     <button class="btn btn-primary" id="openAddBtn">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       <span data-i18n="registerBtn">تسجيل مراجع جديد</span>
+    </button>
+    <button class="btn btn-ghost btn-icon" id="openNotificationsBtn" aria-label="notifications" style="position:relative;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span id="notifBadge" style="display:none; position:absolute; top:2px; inset-inline-end:2px; min-width:16px; height:16px; border-radius:100px; background:var(--danger); color:#fff; font-size:10px; font-weight:700; align-items:center; justify-content:center; padding:0 3px;">0</span>
     </button>
     <button class="btn btn-ghost btn-icon" id="openSettingsBtn" aria-label="settings">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -143,6 +151,14 @@
       <p style="color:var(--ink-faint); font-size:12px; font-weight:700;" data-i18n="treatmentSectionLabel">التاريخ العلاجي</p>
       <div id="detailMeds"></div>
     </div>
+    <div style="padding:0 22px 18px;">
+      <p style="color:var(--ink-faint); font-size:12px; font-weight:700; margin-bottom:8px;">تاريخ انتهاء العلاج (للتذكير)</p>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="date" id="detailTreatmentEndDate" style="flex:1; height:40px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 10px; background:var(--bg);">
+        <button class="btn btn-ghost" id="saveTreatmentEndDateBtn">حفظ</button>
+      </div>
+      <p id="detailTreatmentEndStatus" style="font-size:12px; margin-top:8px;"></p>
+    </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" id="editFromDetailBtn" data-i18n="editBtn">تعديل البيانات</button>
       <button class="btn btn-danger-ghost" id="deleteBtn" data-i18n="deleteRecordBtn">حذف السجل</button>
@@ -151,6 +167,16 @@
 </div>
 
 <!-- Settings Modal -->
+<!-- Notifications Modal -->
+<div class="overlay" id="notificationsOverlay">
+  <div class="modal">
+    <div class="modal-head"><h3>الإشعارات</h3>
+      <button class="btn btn-ghost btn-icon" id="closeNotificationsBtn">✕</button>
+    </div>
+    <div class="modal-body" id="notificationsList"></div>
+  </div>
+</div>
+
 <div class="overlay" id="settingsOverlay">
   <div class="modal" style="max-width:480px;">
     <div class="modal-head"><h3 data-i18n="settingsTitle">الإعدادات</h3>
@@ -170,6 +196,20 @@
           <input type="text" id="activationCodeInput" placeholder="رمز التفعيل" style="flex:1; height:40px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 12px; background:var(--bg);">
           <button class="btn btn-ghost" id="activateCodeBtn">تفعيل</button>
         </div>
+      </div>
+
+      <p style="font-size:12px; font-weight:700; color:var(--ink-faint); margin-bottom:10px;">الإيميلات الفرعية</p>
+      <div class="card" style="padding:14px; margin-bottom:16px;" id="subEmailsCard"></div>
+
+      <p style="font-size:12px; font-weight:700; color:var(--ink-faint); margin-bottom:10px;">التذكير بانتهاء العلاج</p>
+      <div class="card" style="padding:14px; margin-bottom:16px;">
+        <p style="font-size:12.5px; color:var(--ink-faint); margin:0 0 10px;">أظهر تذكيراً قبل انتهاء علاج المراجع بهذه المدة:</p>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="number" id="notifDaysInput" min="0" style="width:80px; height:38px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 10px; background:var(--bg); text-align:center;">
+          <span style="font-size:13px;">يوم/أيام قبل الانتهاء</span>
+          <button class="btn btn-ghost" id="saveNotifDaysBtn" style="margin-inline-start:auto;">حفظ</button>
+        </div>
+        <p style="font-size:11.5px; color:var(--ink-faint); margin:8px 0 0;">هذا الإعداد مشترك بين كل من لديه وصول لهذه الصيدلية (الإيميل الرئيسي والفرعية).</p>
       </div>
 
       <button class="btn btn-danger-ghost btn-block" id="logoutBtn">تسجيل الخروج</button>
@@ -193,7 +233,7 @@
 (function(){
   "use strict";
 
-  var currentUser = null, pharmacyId = null, pharmacy = null;
+  var currentUser = null, pharmacyId = null, pharmacy = null, currentUserRole = "owner";
   var visitors = [];
   var unsubscribeVisitors = null;
   var editingId = null, detailId = null, currentPhotoFile = null, currentPhotoUrl = null;
@@ -274,13 +314,24 @@
     }
     currentUser = user;
     pharmacyId = userData.pharmacyId;
+    currentUserRole = userData.role || "owner";
     loadTheme();
+    initConnectivityBanner();
     init();
   }});
 
   async function init(){
     pharmacy = await getPharmacy(pharmacyId);
     document.getElementById("pharmacyNameLabel").textContent = pharmacy ? pharmacy.name : t("appTitle");
+
+    var active = pharmacy && pharmacy.activeUntil &&
+      (pharmacy.activeUntil.toDate ? pharmacy.activeUntil.toDate() : new Date(pharmacy.activeUntil)) > new Date();
+
+    if(!active){
+      showExpiredGate();
+      return;
+    }
+
     photoFeatureEnabled = await isFeatureEnabledForPharmacy(FEATURE_VISITOR_PHOTO_KEY, pharmacyId);
     document.getElementById("photoFieldWrap").style.display = photoFeatureEnabled ? "flex" : "none";
 
@@ -288,6 +339,50 @@
     listenToVisitors();
     refreshSubscriptionBox();
     maybeShowAd();
+  }
+
+  // === الحالة عند انتهاء "تفعيل استمرارية البرنامج" (نظام مستقل عن
+  // خطة الاشتراك/عدد الإيميلات) — تُخفي التسجيل والبحث وقائمة المراجعين
+  // بالكامل، وتعرض بدلاً منها حقل تجديد فوري، بدل توجيه المستخدم خارج
+  // الصفحة بالكامل. ===
+  function showExpiredGate(){
+    document.getElementById("openAddBtn").style.display = "none";
+    document.getElementById("searchInput").parentElement.style.display = "none";
+
+    document.querySelector("main").innerHTML =
+      '<div class="card" style="max-width:420px; margin:60px auto; text-align:center; padding:32px 24px;">' +
+        '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--danger); margin-bottom:14px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>' +
+        '<h3 style="margin:0 0 8px;">انتهت مدة تفعيل البرنامج</h3>' +
+        '<p style="color:var(--ink-faint); font-size:13.5px; margin:0 0 20px;">سجّل مراجعين وابحث عنهم متوقف مؤقتاً حتى تجديد الاشتراك. بيانات المراجعين السابقة محفوظة ولن تُفقد.</p>' +
+        '<div style="display:flex; gap:8px;">' +
+          '<input type="text" id="renewCodeInput" placeholder="رمز الاشتراك" style="flex:1; height:42px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 12px; background:var(--bg); text-align:center; font-weight:700; text-transform:uppercase;">' +
+          '<button class="btn btn-primary" id="renewBtn">تفعيل</button>' +
+        '</div>' +
+        '<p id="renewErr" style="color:var(--danger); font-size:12.5px; margin-top:10px; display:none;"></p>' +
+        '<button class="btn btn-ghost btn-block" id="renewLogoutBtn" style="margin-top:16px;">تسجيل الخروج</button>' +
+      '</div>';
+
+    document.getElementById("renewLogoutBtn").onclick = function(){
+      auth.signOut().then(function(){ window.location.href = "index.html"; });
+    };
+    document.getElementById("renewBtn").onclick = async function(){
+      var code = document.getElementById("renewCodeInput").value.trim().toUpperCase();
+      var errEl = document.getElementById("renewErr");
+      errEl.style.display = "none";
+      if(!code) return;
+      var btn = this;
+      btn.disabled = true;
+      try{
+        await activatePharmacyAccessCode(code, pharmacyId);
+        showToast("تم التفعيل بنجاح");
+        window.location.reload();
+      }catch(err){
+        errEl.textContent = err.message;
+        errEl.style.display = "block";
+      }finally{
+        btn.disabled = false;
+      }
+    };
   }
 
   function listenToVisitors(){
@@ -298,6 +393,7 @@
         document.getElementById("loadingSpinner").style.display = "none";
         visitors = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
         renderList();
+        refreshNotifications().then(maybeNotifyLocally);
       }, function(err){
         document.getElementById("loadingSpinner").style.display = "none";
         showToast("خطأ بجلب البيانات: " + err.message, true);
@@ -308,7 +404,7 @@
 
   function renderList(){
     var q = document.getElementById("searchInput").value.trim();
-    var list = visitors.filter(function(v){ return !q || (v.name&&v.name.includes(q)) || (v.nickname&&v.nickname.includes(q)); });
+    var list = visitors.filter(function(v){ return !q || (v.name&&v.name.includes(q)) || (v.nickname&&v.nickname.includes(q)) || (v.phone&&v.phone.includes(q)); });
     var body = document.getElementById("tableBody"), empty = document.getElementById("emptyState");
     document.getElementById("listCount").textContent = visitors.length ? t("countLabel")(visitors.length) : "";
 
@@ -449,8 +545,40 @@
       return '<div class="med-card"><div style="display:flex; justify-content:space-between;"><b>'+escapeHtml(m.scientific||t("noSciName"))+'</b>'+
         (m.form?'<span class="chip">'+escapeHtml(m.form)+'</span>':'')+'</div>'+(m.trade?'<p style="color:var(--ink-faint); margin:2px 0 0;">'+escapeHtml(m.trade)+'</p>':'')+'</div>';
     }).join("") : '<p style="color:var(--ink-faint);">'+t("noMeds")+'</p>';
+
+    var endDateInput = document.getElementById("detailTreatmentEndDate");
+    var statusEl = document.getElementById("detailTreatmentEndStatus");
+    if(v.treatmentEndDate){
+      var ed = v.treatmentEndDate.toDate ? v.treatmentEndDate.toDate() : new Date(v.treatmentEndDate);
+      endDateInput.value = ed.toISOString().split("T")[0];
+      var diffDays = Math.ceil((ed.getTime() - Date.now()) / 86400000);
+      if(diffDays < 0) statusEl.innerHTML = '<span style="color:var(--danger); font-weight:700;">انتهى منذ '+Math.abs(diffDays)+' يوم</span>';
+      else if(diffDays === 0) statusEl.innerHTML = '<span style="color:var(--cta); font-weight:700;">ينتهي اليوم</span>';
+      else statusEl.innerHTML = '<span style="color:var(--ink-faint);">متبقي '+diffDays+' يوم</span>';
+    } else {
+      endDateInput.value = "";
+      statusEl.textContent = "";
+    }
+
     detailOverlay.classList.add("open");
   }
+  document.getElementById("saveTreatmentEndDateBtn").onclick = async function(){
+    if(!detailId) return;
+    var val = document.getElementById("detailTreatmentEndDate").value;
+    var btn = this;
+    btn.disabled = true;
+    try{
+      var update = {};
+      if(val){
+        update.treatmentEndDate = firebase.firestore.Timestamp.fromDate(new Date(val + "T00:00:00"));
+      } else {
+        update.treatmentEndDate = firebase.firestore.FieldValue.delete();
+      }
+      await db.collection("pharmacies").doc(pharmacyId).collection("visitors").doc(detailId).update(update);
+      showToast("تم حفظ تاريخ انتهاء العلاج");
+    }catch(err){ showToast("خطأ: "+err.message, true); }
+    finally{ btn.disabled = false; }
+  };
   function closeDetail(){ detailOverlay.classList.remove("open"); detailId=null; }
   document.getElementById("closeDetailBtn").onclick=closeDetail;
   detailOverlay.onclick=function(e){ if(e.target===detailOverlay) closeDetail(); };
@@ -465,7 +593,7 @@
   };
 
   // ---------------- Settings ----------------
-  document.getElementById("openSettingsBtn").onclick=function(){ renderLangToggle(); renderThemeGrid(); settingsOverlay.classList.add("open"); };
+  document.getElementById("openSettingsBtn").onclick=function(){ renderLangToggle(); renderThemeGrid(); renderSubEmailsCard(); settingsOverlay.classList.add("open"); };
   document.getElementById("closeSettingsBtn").onclick=function(){ settingsOverlay.classList.remove("open"); };
   document.getElementById("doneSettingsBtn").onclick=function(){ settingsOverlay.classList.remove("open"); };
   settingsOverlay.onclick=function(e){ if(e.target===settingsOverlay) settingsOverlay.classList.remove("open"); };
@@ -489,9 +617,194 @@
       showToast(r.queued ? "تم حجز الاشتراك القادم" : "تم تفعيل الاشتراك بنجاح");
       document.getElementById("activationCodeInput").value = "";
       refreshSubscriptionBox();
+      renderSubEmailsCard();
     }catch(err){ showToast(err.message, true); }
     finally{ btn.disabled=false; }
   };
+
+  // === إدارة الإيميلات الفرعية — مقصورة على المالك، وعدد الإيميلات
+  // المسموح بها يُحدَّد فقط من الحد الأقصى الحالي على مستند الصيدلية
+  // (المُشتق تلقائياً من خطة الاشتراك، وليس رقماً حراً). ===
+  async function renderSubEmailsCard(){
+    var box = document.getElementById("subEmailsCard");
+    pharmacy = await getPharmacy(pharmacyId);
+    var max = pharmacy.maxSubEmails || 0;
+
+    if(currentUserRole !== "owner"){
+      box.innerHTML = '<p style="font-size:13px; color:var(--ink-faint); margin:0;">إدارة الإيميلات الفرعية متاحة لصاحب الصيدلية فقط.</p>';
+      return;
+    }
+    if(max <= 0){
+      box.innerHTML = '<p style="font-size:13px; color:var(--ink-faint); margin:0;">خطة اشتراكك الحالية لا تتضمن إيميلات فرعية. فعّل رمز خطة تتضمنها لإضافة موظفين.</p>';
+      return;
+    }
+
+    var snap = await db.collection("pharmacies").doc(pharmacyId).collection("subEmails").get();
+    var count = snap.size;
+
+    var listHtml = snap.empty
+      ? '<p style="font-size:13px; color:var(--ink-faint); margin:0 0 10px;">لا توجد إيميلات فرعية بعد.</p>'
+      : snap.docs.map(function(d){
+          return '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--line-soft);">' +
+            '<span class="num" style="font-size:12.5px;">'+escapeHtml(d.id)+'</span>' +
+            '<div style="display:flex; gap:4px;">' +
+              '<button class="btn btn-icon btn-ghost" data-edit-subemail="'+d.id+'" style="width:30px; height:30px;">✎</button>' +
+              '<button class="btn btn-icon btn-danger-ghost" data-del-subemail="'+d.id+'" style="width:30px; height:30px;">✕</button>' +
+            '</div></div>';
+        }).join('');
+
+    var canAdd = count < max;
+
+    box.innerHTML =
+      '<p style="font-size:12.5px; color:var(--ink-faint); margin:0 0 10px;">'+count+' / '+max+' إيميلات مستخدَمة</p>' +
+      listHtml +
+      (canAdd
+        ? '<div style="display:flex; gap:8px; margin-top:10px;"><input type="email" id="newSubEmailInput" placeholder="بريد إلكتروني جديد" style="flex:1; height:38px; border:1px solid var(--line); border-radius:var(--radius-sm); padding:0 10px; background:var(--bg);"><button class="btn btn-ghost" id="addSubEmailBtn">إضافة</button></div>'
+        : '<p style="font-size:12px; color:var(--ink-faint); margin-top:10px;">وصلت للحد الأقصى لخطتك الحالية — فعّل خطة أعلى لإضافة المزيد.</p>');
+
+    box.querySelectorAll("[data-del-subemail]").forEach(function(btn){
+      btn.onclick = async function(){
+        var email = btn.getAttribute("data-del-subemail");
+        if(!confirm("حذف "+email+" من الوصول لهذه الصيدلية؟")) return;
+        await db.collection("pharmacies").doc(pharmacyId).collection("subEmails").doc(email).delete();
+        renderSubEmailsCard();
+      };
+    });
+    box.querySelectorAll("[data-edit-subemail]").forEach(function(btn){
+      btn.onclick = async function(){
+        var oldEmail = btn.getAttribute("data-edit-subemail");
+        var newEmail = prompt("البريد الإلكتروني الجديد بدل:", oldEmail);
+        if(!newEmail) return;
+        newEmail = newEmail.trim().toLowerCase();
+        if(!newEmail || newEmail === oldEmail) return;
+        try{
+          await db.collection("pharmacies").doc(pharmacyId).collection("subEmails").doc(newEmail).set({
+            email: newEmail, addedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          await db.collection("pharmacies").doc(pharmacyId).collection("subEmails").doc(oldEmail).delete();
+          showToast("تم التحديث");
+          renderSubEmailsCard();
+        }catch(err){ showToast("خطأ: "+err.message, true); }
+      };
+    });
+    var addBtn = document.getElementById("addSubEmailBtn");
+    if(addBtn){
+      addBtn.onclick = async function(){
+        var input = document.getElementById("newSubEmailInput");
+        var email = input.value.trim().toLowerCase();
+        if(!email || email.indexOf("@") === -1){ showToast("أدخل بريداً إلكترونياً صحيحاً", true); return; }
+        try{
+          await db.collection("pharmacies").doc(pharmacyId).collection("subEmails").doc(email).set({
+            email: email, addedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          showToast("تمت الإضافة — أخبر صاحب هذا البريد بتسجيل الدخول بحساب Google الخاص به لينضم تلقائياً");
+          renderSubEmailsCard();
+        }catch(err){ showToast("تعذّرت الإضافة: "+err.message, true); }
+      };
+    }
+  }
+
+  // ---------------- الإشعارات (تذكير بانتهاء العلاج) ----------------
+  // القائمة مبنية من نفس بيانات المراجعين المحمَّلة أصلاً (visitors)،
+  // وهي بالفعل مشتركة بين الإيميل الرئيسي وأي إيميل فرعي — لأنها كلها
+  // تقرأ نفس مستندات الصيدلية، فلا حاجة لأي مزامنة إضافية.
+  var lastNotifDaysBefore = 3;
+
+  async function refreshNotifications(){
+    var daysBefore = (pharmacy && pharmacy.notificationDaysBefore !== undefined) ? pharmacy.notificationDaysBefore : 3;
+    lastNotifDaysBefore = daysBefore;
+    var input = document.getElementById("notifDaysInput");
+    if(input && document.activeElement !== input) input.value = daysBefore;
+
+    var now = Date.now();
+    var thresholdMs = daysBefore * 86400000;
+    var alerts = visitors.filter(function(v){
+      if(!v.treatmentEndDate) return false;
+      var d = v.treatmentEndDate.toDate ? v.treatmentEndDate.toDate() : new Date(v.treatmentEndDate);
+      return (d.getTime() - now) <= thresholdMs;
+    }).sort(function(a,b){
+      var da = (a.treatmentEndDate.toDate?a.treatmentEndDate.toDate():new Date(a.treatmentEndDate)).getTime();
+      var db_ = (b.treatmentEndDate.toDate?b.treatmentEndDate.toDate():new Date(b.treatmentEndDate)).getTime();
+      return da - db_;
+    });
+
+    var badge = document.getElementById("notifBadge");
+    if(alerts.length){ badge.style.display="flex"; badge.textContent = alerts.length>99?"99+":alerts.length; }
+    else { badge.style.display="none"; }
+
+    return alerts;
+  }
+
+  function renderNotificationsList(alerts){
+    var list = document.getElementById("notificationsList");
+    if(!alerts.length){ list.innerHTML = '<p style="color:var(--ink-faint); text-align:center; padding:30px 0;">لا توجد تذكيرات حالياً.</p>'; return; }
+    list.innerHTML = alerts.map(function(v){
+      var d = v.treatmentEndDate.toDate ? v.treatmentEndDate.toDate() : new Date(v.treatmentEndDate);
+      var diffDays = Math.ceil((d.getTime()-Date.now())/86400000);
+      var statusText = diffDays < 0 ? ('انتهى منذ '+Math.abs(diffDays)+' يوم') : (diffDays===0 ? 'ينتهي اليوم' : ('متبقي '+diffDays+' يوم'));
+      return '<div class="row" data-visitor-id="'+v.id+'" style="cursor:pointer;">'+
+        '<div style="flex:1;"><b>'+escapeHtml(v.name)+'</b>'+(v.phone?'<p class="num" style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">'+escapeHtml(v.phone)+'</p>':'')+'</div>'+
+        '<span class="chip '+(diffDays<0?'chip-danger':'')+'">'+statusText+'</span>'+
+      '</div>';
+    }).join("");
+    list.querySelectorAll("[data-visitor-id]").forEach(function(row){
+      row.onclick = function(){
+        document.getElementById("notificationsOverlay").classList.remove("open");
+        openDetail(row.getAttribute("data-visitor-id"));
+      };
+    });
+  }
+
+  document.getElementById("openNotificationsBtn").onclick = async function(){
+    var alerts = await refreshNotifications();
+    renderNotificationsList(alerts);
+    document.getElementById("notificationsOverlay").classList.add("open");
+  };
+  document.getElementById("closeNotificationsBtn").onclick = function(){ document.getElementById("notificationsOverlay").classList.remove("open"); };
+  document.getElementById("notificationsOverlay").onclick = function(e){ if(e.target===this) this.classList.remove("open"); };
+
+  document.getElementById("saveNotifDaysBtn").onclick = async function(){
+    var v = parseInt(document.getElementById("notifDaysInput").value, 10);
+    if(isNaN(v) || v < 0){ showToast("أدخل رقماً صحيحاً", true); return; }
+    var btn = this;
+    btn.disabled = true;
+    try{
+      await db.collection("pharmacies").doc(pharmacyId).update({ notificationDaysBefore: v });
+      pharmacy.notificationDaysBefore = v;
+      showToast("تم الحفظ");
+      refreshNotifications();
+    }catch(err){ showToast("خطأ: "+err.message, true); }
+    finally{ btn.disabled = false; }
+  };
+
+  // إشعار محلي على الجهاز — يظهر فقط والتطبيق مفتوح فعلياً (بدون
+  // Cloud Functions/خطة مدفوعة). يُكتفى بإشعار واحد لكل صيدلية يومياً
+  // حتى لا يتكرر مع كل تحديث لحظي للبيانات.
+  async function maybeNotifyLocally(){
+    var alerts = await refreshNotifications();
+    if(!alerts.length) return;
+    if(!("Notification" in window)) return;
+
+    var todayKey = "notified_" + pharmacyId + "_" + new Date().toDateString();
+    if(sessionStorage.getItem(todayKey)) return;
+
+    if(Notification.permission === "default"){
+      try{ await Notification.requestPermission(); }catch(e){ return; }
+    }
+    if(Notification.permission !== "granted") return;
+
+    var title = "تذكير بمواعيد العلاج";
+    var body = alerts.length + (alerts.length===1 ? " مراجع يقترب/انتهى موعد علاجه" : " مراجعين يقترب/انتهى موعد علاجهم");
+
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.ready.then(function(reg){
+        reg.showNotification(title, { body: body, icon: "icon-192.png", badge: "icon-192.png" });
+      }).catch(function(){ new Notification(title, { body: body, icon: "icon-192.png" }); });
+    } else {
+      new Notification(title, { body: body, icon: "icon-192.png" });
+    }
+    sessionStorage.setItem(todayKey, "1");
+  }
 
   // ---------------- Ad overlay ----------------
   async function maybeShowAd(){

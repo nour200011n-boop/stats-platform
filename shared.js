@@ -60,6 +60,20 @@ function setTheme(id) {
   localStorage.setItem("theme", id);
 }
 
+// ---------------- مؤشر حالة الاتصال (لدعم العمل بلا إنترنت) ----------------
+function initConnectivityBanner(){
+  var el = document.createElement("div");
+  el.id = "connBanner";
+  el.style.cssText = "display:none; position:sticky; top:0; z-index:40; background:var(--cta); color:#fff; text-align:center; font-size:12.5px; padding:6px 10px;";
+  el.textContent = "غير متصل بالإنترنت — تعمل الآن على آخر بيانات محفوظة على الجهاز، وسيُرفع أي تعديل تلقائياً عند عودة الاتصال.";
+  document.body.insertBefore(el, document.body.firstChild);
+
+  function update(){ el.style.display = navigator.onLine ? "none" : "block"; }
+  window.addEventListener("online", update);
+  window.addEventListener("offline", update);
+  update();
+}
+
 // ---------------- حراسة الدخول ----------------
 // تُستدعى أعلى كل صفحة محمية. تنتظر معرفة حالة تسجيل الدخول ثم تستدعي
 // onReady(user, userData) — أو تُعيد التوجيه تلقائياً حسب الحالة.
@@ -83,14 +97,10 @@ function guardPage(options) {
       return;
     }
 
-    // مستخدم عادي: تحقّق من تسلسل الفتح -> إنشاء الصيدلية -> التطبيق
-    var unlocked = data && data.unlockedUntil &&
-      (data.unlockedUntil.toDate ? data.unlockedUntil.toDate() : new Date(data.unlockedUntil)) > new Date();
-
-    if (!unlocked && !options.allowUnlockedCheckSkip) {
-      window.location.href = "unlock.html";
-      return;
-    }
+    // مستخدم عادي: الشرط الوحيد هنا هو وجود صيدلية مرتبطة بالحساب.
+    // فحص "هل الصيدلية لا تزال فعّالة؟" لم يعد هنا — أصبح داخل app.html
+    // نفسها بعد جلب بيانات الصيدلية، لأنه يُعرض كحالة داخل الصفحة
+    // (إخفاء قوائم المراجعين + نموذج تجديد) بدل توجيه كامل خارجها.
     if (!data || !data.pharmacyId) {
       if (!options.allowMissingPharmacy) {
         window.location.href = "unlock.html";

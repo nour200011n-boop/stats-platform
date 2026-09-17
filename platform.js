@@ -8,6 +8,15 @@ async function getPharmacy(pharmacyId) {
   return snap.exists ? Object.assign({ id: snap.id }, snap.data()) : null;
 }
 
+// === تبحث في كل الصيدليات (بلا معرفة أيها مسبقاً) عن صيدلية أضافت
+// هذا الإيميل كإيميل فرعي معتمَد. تُستخدم عند أول دخول لحساب جديد
+// لتحديد: هل ينشئ صيدلية جديدة، أم ينضم تلقائياً لصيدلية دعته؟ ===
+async function findPharmacyIdForSubEmail(email) {
+  var q = await db.collectionGroup("subEmails").where("email", "==", email).limit(1).get();
+  if (q.empty) return null;
+  return q.docs[0].ref.parent.parent.id; // مسار المستند: pharmacies/{id}/subEmails/{email}
+}
+
 // ---------------- الميزات الديناميكية (Feature Gating) ----------------
 
 async function isFeatureEnabledGlobally(key) {
@@ -88,7 +97,45 @@ async function recordAdView(adId) {
   });
 }
 
-// ---------------- تفعيل رمز اشتراك ----------------
+// ---------------- تفعيل استمرارية البرنامج (نظام مستقل عن خطط الاشتراك) ----------------
+
+// === الدالة الرئيسية: تفعيل/تجديد استمرارية عمل البرنامج للصيدلية ===
+// مستقل تماماً عن activateSubscriptionCode أدناه (الذي يتحكم بعدد
+// الإيميلات الفرعية والميزات عبر خطط الاشتراك) — لهما رمزان مختلفان
+// (accessCodes مقابل activationCodes)، ويمكن استخدامهما بأي ترتيب أو
+// فاصل زمني، وكل نظام يعمل بشكل مستقل عن الآخر تماماً.
+async function activatePharmacyAccessCode(code, pharmacyId) {
+  var codeRef = db.collection("accessCodes").doc(code);
+  var pharmacyRef = db.collection("pharmacies").doc(pharmacyId);
+
+  return db.runTransaction(async function (t) {
+    var codeSnap = await t.get(codeRef);
+    if (!codeSnap.exists) throw new Error("رمز الاشتراك غير صحيح.");
+    var c = codeSnap.data();
+    if (c.isCancelled) throw new Error("تم إلغاء هذا الرمز.");
+    if ((c.usedByPharmacyIds || []).indexOf(pharmacyId) > -1) throw new Error("تم استخدام هذا الرمز مسبقاً لهذه الصيدلية.");
+    if ((c.usedCount || 0) >= c.maxUses) throw new Error("تم استنفاد عدد مرات استخدام هذا الرمز.");
+
+    var pSnap = await t.get(pharmacyRef);
+    var pData = pSnap.data() || {};
+    var now = Date.now();
+    var currentActive = pData.activeUntil &&
+      (pData.activeUntil.toDate ? pData.activeUntil.toDate().getTime() : new Date(pData.activeUntil).getTime());
+    // تمديد فوق تاريخ الانتهاء الحالي إن كان لا يزال سارياً، بدل استبداله.
+    var base = (currentActive && currentActive > now) ? currentActive : now;
+    var newActiveUntil = new Date(base + c.durationDays * 86400000);
+
+    t.update(codeRef, {
+      usedCount: firebase.firestore.FieldValue.increment(1),
+      usedByPharmacyIds: firebase.firestore.FieldValue.arrayUnion(pharmacyId)
+    });
+    t.update(pharmacyRef, {
+      activeUntil: firebase.firestore.Timestamp.fromDate(newActiveUntil)
+    });
+  });
+}
+
+// ---------------- تفعيل رمز اشتراك (خطط: عدد الإيميلات + الميزات) ----------------
 
 async function activateSubscriptionCode(code, pharmacyId) {
   var codeRef = db.collection("activationCodes").doc(code);
@@ -105,6 +152,13 @@ async function activateSubscriptionCode(code, pharmacyId) {
     var pharmacySnap = await t.get(pharmacyRef);
     if (!pharmacySnap.exists) throw new Error("الصيدلية غير موجودة.");
     var pharmacy = pharmacySnap.data();
+
+    // نقرأ الخطة الآن (قبل أي كتابة، كما تتطلب معاملات Firestore) لنعرف
+    // maxSubEmails الخاص بها — عدد الإيميلات الفرعية أصبح يُحدَّد فقط عبر
+    // خطة الاشتراك، وليس حقلاً يُعدَّل يدوياً من لوحة الإدارة.
+    var planSnap = await t.get(db.collection("subscriptionPlans").doc(c.planId));
+    var planMaxSubEmails = planSnap.exists ? (planSnap.data().maxSubEmails || 0) : 0;
+
     var now = new Date();
     var queued = false;
     var newSub;
@@ -115,6 +169,8 @@ async function activateSubscriptionCode(code, pharmacyId) {
         queuedDurationDays: c.durationDays
       });
       queued = true;
+      // مؤجل: لا يُغيَّر الحد الأقصى للإيميلات الفرعية الآن — يبقى حسب
+      // الخطة الحالية إلى أن يُرقّى الاشتراك المؤجل فعلياً عند انتهاء الحالي.
     } else {
       newSub = {
         planId: c.planId,
@@ -126,7 +182,10 @@ async function activateSubscriptionCode(code, pharmacyId) {
       };
     }
 
-    t.update(pharmacyRef, { subscription: newSub });
+    var pharmacyUpdate = { subscription: newSub };
+    if (!queued) pharmacyUpdate.maxSubEmails = planMaxSubEmails;
+
+    t.update(pharmacyRef, pharmacyUpdate);
     t.update(codeRef, {
       usedCount: firebase.firestore.FieldValue.increment(1),
       usageLog: firebase.firestore.FieldValue.arrayUnion({
