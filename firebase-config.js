@@ -13,12 +13,13 @@
 // القيم.
 
 const firebaseConfig = {
-  apiKey: "ضع_apiKey_هنا",
-  authDomain: "ضع_authDomain_هنا",
-  projectId: "ضع_projectId_هنا",
-  storageBucket: "ضع_storageBucket_هنا",
-  messagingSenderId: "ضع_messagingSenderId_هنا",
-  appId: "ضع_appId_هنا"
+  apiKey: "AIzaSyBvITUcJRSc5rpE6CIbTkqU5Jt1EAEiqcI",
+  authDomain: "pharmacy-records-6a234.firebaseapp.com",
+  projectId: "pharmacy-records-6a234",
+  storageBucket: "pharmacy-records-6a234.firebasestorage.app",
+  messagingSenderId: "992397049141",
+  appId: "1:992397049141:web:20a04bd0670031b966607c",
+  measurementId: "G-NEM8JMBKQV"
 };
 
 firebase.initializeApp(firebaseConfig);
