@@ -154,8 +154,10 @@ async function activateSubscriptionCode(code, pharmacyId) {
     var pharmacy = pharmacySnap.data();
 
     // نقرأ الخطة الآن (قبل أي كتابة، كما تتطلب معاملات Firestore) لنعرف
-    // maxSubEmails الخاص بها — عدد الإيميلات الفرعية أصبح يُحدَّد فقط عبر
-    // خطة الاشتراك، وليس حقلاً يُعدَّل يدوياً من لوحة الإدارة.
+    // كم إيميلاً فرعياً تضيفه. عدد الإيميلات الفرعية تراكمي: يبدأ من
+    // صفر لكل صيدلية جديدة، ويزداد بكل رمز يُفعَّل بنجاح (لا يُستبدَل
+    // بقيمة الخطة، بل يُضاف إليه) — بغض النظر إن كان تفعيلاً فورياً أو
+    // مؤجلاً للجزء الزمني من الاشتراك، لأنه رصيد تراكمي منفصل عن ذلك.
     var planSnap = await t.get(db.collection("subscriptionPlans").doc(c.planId));
     var planMaxSubEmails = planSnap.exists ? (planSnap.data().maxSubEmails || 0) : 0;
 
@@ -169,8 +171,6 @@ async function activateSubscriptionCode(code, pharmacyId) {
         queuedDurationDays: c.durationDays
       });
       queued = true;
-      // مؤجل: لا يُغيَّر الحد الأقصى للإيميلات الفرعية الآن — يبقى حسب
-      // الخطة الحالية إلى أن يُرقّى الاشتراك المؤجل فعلياً عند انتهاء الحالي.
     } else {
       newSub = {
         planId: c.planId,
@@ -182,8 +182,10 @@ async function activateSubscriptionCode(code, pharmacyId) {
       };
     }
 
-    var pharmacyUpdate = { subscription: newSub };
-    if (!queued) pharmacyUpdate.maxSubEmails = planMaxSubEmails;
+    var pharmacyUpdate = {
+      subscription: newSub,
+      maxSubEmails: firebase.firestore.FieldValue.increment(planMaxSubEmails)
+    };
 
     t.update(pharmacyRef, pharmacyUpdate);
     t.update(codeRef, {

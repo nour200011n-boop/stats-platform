@@ -332,6 +332,14 @@
       return;
     }
 
+    // الإيميلات الفرعية تحديداً (وليس صاحب الصيدلية) تفقد الوصول لبيانات
+    // المراجعين تلقائياً إن انتهت خطة الاشتراك — قواعد الأمان تمنع
+    // القراءة أصلاً، وهذا فقط لعرض رسالة واضحة بدل خطأ صلاحيات خام.
+    if(currentUserRole === "staff" && !isSubscriptionActive(pharmacy.subscription)){
+      showStaffSubscriptionExpiredGate();
+      return;
+    }
+
     photoFeatureEnabled = await isFeatureEnabledForPharmacy(FEATURE_VISITOR_PHOTO_KEY, pharmacyId);
     document.getElementById("photoFieldWrap").style.display = photoFeatureEnabled ? "flex" : "none";
 
@@ -339,6 +347,26 @@
     listenToVisitors();
     refreshSubscriptionBox();
     maybeShowAd();
+  }
+
+  // === حالة الإيميل الفرعي عندما تنتهي خطة الاشتراك (عدد الإيميلات) —
+  // لا يملك صلاحية التجديد بنفسه (مقصور على صاحب الصيدلية)، لذا الرسالة
+  // توجّهه للتواصل معه بدل عرض حقل تفعيل لن ينجح أصلاً. ===
+  function showStaffSubscriptionExpiredGate(){
+    document.getElementById("openAddBtn").style.display = "none";
+    document.getElementById("searchInput").parentElement.style.display = "none";
+
+    document.querySelector("main").innerHTML =
+      '<div class="card" style="max-width:420px; margin:60px auto; text-align:center; padding:32px 24px;">' +
+        '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--danger); margin-bottom:14px;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>' +
+        '<h3 style="margin:0 0 8px;">انتهت خطة الاشتراك</h3>' +
+        '<p style="color:var(--ink-faint); font-size:13.5px; margin:0 0 20px;">تواصل مع صاحب الصيدلية لتجديد خطة الاشتراك — بمجرد تجديدها ستعود قادراً على الوصول فوراً دون أي خطوة إضافية منك.</p>' +
+        '<button class="btn btn-ghost btn-block" id="staffGateLogoutBtn">تسجيل الخروج</button>' +
+      '</div>';
+
+    document.getElementById("staffGateLogoutBtn").onclick = function(){
+      auth.signOut().then(function(){ window.location.href = "index.html"; });
+    };
   }
 
   // === الحالة عند انتهاء "تفعيل استمرارية البرنامج" (نظام مستقل عن

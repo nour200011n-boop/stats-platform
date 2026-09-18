@@ -9,7 +9,7 @@
 // ملاحظة: عند تعديل أي ملف من ملفات التطبيق (HTML/CSS/JS)، غيّر رقم
 // النسخة هنا (مثلاً v2, v3...) حتى يعرف المتصفح أن هناك تحديثاً جديداً
 // يجب تنزيله وتخزينه بدل الاستمرار بالنسخة القديمة المحفوظة.
-const CACHE_NAME = "pharmacy-records-v2";
+const CACHE_NAME = "pharmacy-records-v1";
 
 const APP_SHELL = [
   "index.html",

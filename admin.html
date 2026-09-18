@@ -207,7 +207,6 @@
     if(!p) return;
     var body = document.getElementById("pharmacyOverlayBody");
     var subEmailsSnap = await db.collection("pharmacies").doc(p.id).collection("subEmails").get();
-    var currentPlan = plans.find(function(pl){ return pl.id === p.subscription.planId; });
     var activeNow = p.activeUntil &&
       (p.activeUntil.toDate ? p.activeUntil.toDate() : new Date(p.activeUntil)) > new Date();
 
@@ -231,9 +230,9 @@
       '</div>'+
 
       '<div style="border-top:1px solid var(--line-soft); margin:18px 0; padding-top:18px;">'+
-        '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">الحد الأقصى للإيميلات الفرعية</p>'+
+        '<p style="font-weight:700; font-size:13px; margin-bottom:8px;">الحد الأقصى للإيميلات الفرعية (تراكمي)</p>'+
         '<p style="font-size:13.5px; color:var(--ink-faint); margin:0;">'+
-          (p.maxSubEmails || 0) + ' — عبر خطة "' + escapeHtml(currentPlan ? currentPlan.name : 'بلا خطة') + '"' +
+          (p.maxSubEmails || 0) + ' — مجموع كل رموز الخطط التي فُعِّلت لهذه الصيدلية' +
         '</p>'+
         '<p style="font-size:12px; color:var(--ink-faint); margin-top:4px;">يُحدَّد هذا الرقم من خطة الاشتراك فقط (تبويب "الخطط والتفعيل") — لم يعد قابلاً للتعديل هنا مباشرة.</p>'+
       '</div>'+
@@ -273,7 +272,7 @@
       '<div class="mini-form">'+
         '<p style="font-weight:700; margin:0 0 12px;">خطة اشتراك جديدة</p>'+
         '<div class="field"><label>اسم الخطة</label><input type="text" id="planNameInput"></div>'+
-        '<div class="field"><label>الحد الأقصى للإيميلات الفرعية</label><input type="number" id="planMaxSubEmails" value="1"></div>'+
+        '<div class="field"><label>عدد الإيميلات الفرعية التي تضيفها هذه الخطة</label><input type="number" id="planMaxSubEmails" value="1"></div>'+
         '<label style="display:flex; align-items:center; gap:8px; font-size:13.5px; margin-bottom:14px;"><input type="checkbox" id="planRemoveAds"> إخفاء الإعلانات لهذه الخطة</label>'+
         '<button class="btn btn-primary" id="createPlanBtn">إنشاء الخطة</button>'+
       '</div>'+
@@ -332,14 +331,14 @@
       if(editingPlanId === pl.id){
         return '<div class="row" style="cursor:default; flex-direction:column; align-items:stretch; gap:10px;">'+
           '<div class="field" style="margin:0;"><label>اسم الخطة</label><input type="text" id="editPlanName" value="'+escapeHtml(pl.name)+'"></div>'+
-          '<div class="field" style="margin:0;"><label>الحد الأقصى للإيميلات الفرعية</label><input type="number" id="editPlanMaxSubEmails" value="'+(pl.maxSubEmails||0)+'"></div>'+
+          '<div class="field" style="margin:0;"><label>عدد الإيميلات الفرعية التي تضيفها هذه الخطة</label><input type="number" id="editPlanMaxSubEmails" value="'+(pl.maxSubEmails||0)+'"></div>'+
           '<label style="display:flex; align-items:center; gap:8px; font-size:13px;"><input type="checkbox" id="editPlanRemoveAds" '+(pl.removeAds?'checked':'')+'> إخفاء الإعلانات</label>'+
           '<div style="display:flex; gap:8px;"><button class="btn btn-primary" data-save-plan="'+pl.id+'">حفظ</button><button class="btn btn-ghost" data-cancel-edit-plan="1">إلغاء</button></div>'+
         '</div>';
       }
       return '<div class="row" style="cursor:default;">'+
         '<div style="flex:1;"><b>'+escapeHtml(pl.name)+'</b>'+
-          '<p style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">'+(pl.maxSubEmails||0)+' إيميل فرعي'+(pl.removeAds?' — بدون إعلانات':'')+'</p>'+
+          '<p style="font-size:12px; color:var(--ink-faint); margin:2px 0 0;">+'+(pl.maxSubEmails||0)+' إيميل فرعي'+(pl.removeAds?' — بدون إعلانات':'')+'</p>'+
         '</div>'+
         '<button class="btn btn-icon btn-ghost" data-edit-plan="'+pl.id+'">✎</button>'+
         '<button class="btn btn-icon btn-danger-ghost" data-del-plan="'+pl.id+'">✕</button>'+
